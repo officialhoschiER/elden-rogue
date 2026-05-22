@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Elden Rogue - Pokélike Edition</title>
+  <style>
+    /* --- CSS: CLEANES FULL-SCREEN DESIGN (NO SCROLLING) --- */
+    :root {
+      --gold: #cda34f;
+      --gold-dark: #8c6d2d;
+      --gold-glow: rgba(205, 163, 79, 0.2);
+      --bg-dark: #0b0b0b;
+      --panel-bg: #141414;
+      --border-color: #3a3224;
+      --map-overlay: linear-gradient(to bottom, rgba(5, 5, 5, 0.75), rgba(5, 5, 5, 0.85));
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: #ede6d4;
+      font-family: 'Cinzel', 'Georgia', serif;
+      margin: 0; padding: 0;
+      display: flex; justify-content: center; align-items: center;
+      width: 100vw; height: 100vh;
+      overflow: hidden;
+    }
+
+    #game-container {
+      display: flex;
+      width: 100vw; height: 100vh;
+      background-color: var(--bg-dark);
+      box-sizing: border-box;
+      position: relative;
+    }
+
+    /* POP-UP WINDOWS (MODAL) */
+    .modal-overlay {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background-color: rgba(5, 5, 5, 0.9);
+      z-index: 200;
+      display: flex; justify-content: center; align-items: center;
+      backdrop-filter: blur(8px);
+    }
+
+    .modal-content {
+      background-color: #181818;
+      border: 1px solid var(--gold);
+      border-radius: 4px;
+      padding: 40px; width: 50%; max-width: 600px;
+      text-align: center;
+      box-shadow: 0px 0px 30px rgba(0, 0, 0, 0.6);
+      animation: fadeIn 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+
+    .loot-options-container {
+      display: flex; justify-content: center; gap: 25px; margin: 30px 0;
+    }
+
+    .loot-card {
+      background-color: #111; border: 1px solid var(--border-color);
+      border-radius: 4px; padding: 20px; width: 45%;
+      cursor: pointer; transition: all 0.3s ease;
+    }
+    .loot-card:hover { border-color: #2ecc71; background-color: #1a241e; transform: translateY(-4px); }
+
+    .class-selection { display: flex; gap: 20px; margin-top: 35px; }
+    .class-card {
+      background-color: #111; border: 1px solid var(--border-color);
+      border-radius: 4px; padding: 20px; flex: 1;
+      cursor: pointer; transition: all 0.3s ease;
+    }
+    .class-card:hover { border-color: var(--gold); transform: translateY(-4px); }
+
+    .tower-selection-container { display: flex; flex-direction: column; gap: 15px; margin: 25px 0; }
+    .tower-rune-option {
+      background-color: #111; border: 1px solid #333; border-radius: 4px; padding: 15px;
+      cursor: not-allowed; opacity: 0.4; text-align: left; transition: all 0.2s ease;
+    }
+    .tower-rune-option.unlocked { cursor: pointer; opacity: 1; border-color: var(--gold-dark); }
+    .tower-rune-option.unlocked:hover { border-color: var(--gold); background-color: #1c1710; }
+    .tower-rune-option.active { border-color: #2ecc71 !important; background-color: #121f17 !important; }
+
+    /* LEFT SIDE PANEL */
+    .side-panel {
+      width: 22%; background-color: var(--panel-bg);
+      padding: 20px 15px; box-sizing: border-box;
+      border-right: 1px solid var(--border-color);
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    
+    .side-panel h2 {
+      color: var(--gold); font-size: 1.1rem; letter-spacing: 2px;
+      margin-top: 0; margin-bottom: 5px; border-bottom: 1px solid var(--border-color);
+      padding-bottom: 8px; text-align: center; text-transform: uppercase;
+    }
+
+    .player-card {
+      background-color: rgba(10, 10, 10, 0.5);
+      border: 1px solid var(--border-color);
+      border-radius: 4px; padding: 12px; text-align: center;
+    }
+
+    .talisman-slot-row { display: flex; flex-direction: column; gap: 5px; text-align: left; margin-top: 5px; }
+    .talisman-item-inline {
+      background: rgba(0,0,0,0.4); border: 1px solid #222; padding: 4px 8px; 
+      font-size: 0.8rem; border-radius: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* DIE ANZEIGE FÜR DIE GROSSEN RUNEN LINKS MIT ECHTEN BILDERN */
+    .mini-runen-container { display: flex; flex-direction: column; gap: 8px; margin-top: 5px; }
+    .mini-rune-slot {
+      display: flex; align-items: center; gap: 12px;
+      background-color: rgba(5, 5, 5, 0.4); border: 1px solid #222;
+      border-radius: 4px; padding: 8px; opacity: 0.2; filter: grayscale(100%);
+      position: relative; transition: all 0.3s ease;
+    }
+    .mini-rune-slot.unlocked { opacity: 0.6; filter: grayscale(50%); border-color: var(--gold-dark); }
+    .mini-rune-slot.active {
+      opacity: 1 !important; filter: grayscale(0%) !important;
+      border-color: var(--gold) !important; background-color: rgba(30, 25, 15, 0.4);
+      box-shadow: 0 0 10px rgba(205, 163, 79, 0.3);
+    }
+    .mini-rune-img-frame {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: flex; justify-content: center; align-items: center;
+      background-color: #000; overflow: hidden; border: 1px solid #333;
+    }
+    .mini-rune-img-frame img {
+      width: 100%; height: 100%; object-fit: contain;
+    }
+    .mini-rune-slot.active .mini-rune-img-frame { border-color: var(--gold); }
+    
+    .mini-rune-name { font-size: 0.75rem; font-weight: bold; color: #666; text-align: left; }
+    .mini-rune-slot.unlocked .mini-rune-name { color: #eee; }
+    .mini-rune-slot.active .mini-rune-name { color: var(--gold); }
+
+    .mini-rune-slot::after {
+      content: attr(data-tooltip); position: absolute; left: 105%; top: 50%; transform: translateY(-50%);
+      background-color: #111; color: #ede6d4; border: 1px solid var(--gold-dark);
+      padding: 8px 12px; border-radius: 2px; font-size: 0.8rem;
+      white-space: nowrap; opacity: 0; visibility: hidden; z-index: 100;
+    }
+    .mini-rune-slot:hover::after { opacity: 1; visibility: visible; }
+
+    /* HAUPTFELD IN DER MITTE */
+    .main-panel {
+      width: 78%; height: 100%;
+      display: flex; flex-direction: column;
+      padding: 20px; box-sizing: border-box;
+    }
+    .main-panel h1 {
+      color: var(--gold); text-align: center; margin-top: 0; margin-bottom: 10px;
+      font-size: 1.6rem; letter-spacing: 6px;
+    }
+
+    /* MAP CONTAINER */
+    .map-wrapper-relative {
+      position: relative; flex-grow: 1; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden;
+    }
+
+    .map-scroll-area {
+      width: 100%; height: 100%; background-size: cover; background-position: center;
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      box-shadow: inset 0 0 100px rgba(0,0,0,0.95); box-sizing: border-box; background-color: #1a1a1a;
+    }
+
+    #map-grid { 
+      display: flex; flex-direction: column-reverse; justify-content: space-between;
+      height: 90%; width: 100%; max-width: 700px; position: relative; 
+    }
+    .map-row { display: flex; justify-content: space-around; width: 100%; position: relative; z-index: 5; }
+
+    .map-node {
+      width: 64px; height: 64px; background-color: rgba(12, 12, 12, 0.98);
+      border: 2px solid #555; border-radius: 50%;
+      display: flex; justify-content: center; align-items: center; 
+      cursor: not-allowed; opacity: 0.35; position: relative;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.9);
+    }
+
+    .map-node-img { width: 65%; height: 65%; object-fit: contain; pointer-events: none; }
+
+    .map-node::after {
+      content: attr(data-tooltip); position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%);
+      background-color: #111; color: #ede6d4; border: 1px solid var(--gold-dark);
+      padding: 8px 14px; border-radius: 2px; font-size: 0.85rem; white-space: nowrap; opacity: 0; visibility: hidden; z-index: 10;
+    }
+    .map-node:hover::after { opacity: 1; visibility: visible; }
+    
+    .map-node.selectable { border-color: var(--gold); box-shadow: 0 0 25px rgba(205, 163, 79, 0.6); opacity: 1; cursor: pointer; }
+    .map-node.selectable:hover { transform: scale(1.15); background-color: #231c12; border-color: #fff; box-shadow: 0 0 30px var(--gold); }
+    .map-node.current-pos { border-color: var(--gold); background-color: #332612; opacity: 1; box-shadow: inset 0 0 15px var(--gold); }
+    .map-node.completed { border-color: #2ecc71; background-color: rgba(20, 45, 30, 0.9); opacity: 0.6; }
+
+    /* KAMPFARENA MODUS (DYNAMISCHER HINTERGRUND PER JS) */
+    .battle-arena {
+      flex-grow: 1; background-size: cover; background-position: center; border: 1px solid var(--gold-dark); border-radius: 4px;
+      padding: 25px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: inset 0 0 50px rgba(0,0,0,0.9);
+      background-color: #151515;
+    }
+
+    .fighters-container { display: flex; justify-content: space-between; align-items: flex-end; flex-grow: 1; margin-bottom: 20px; padding: 0 30px; position: relative; }
+    .fighter-wrapper { width: 220px; display: flex; flex-direction: column; align-items: center; background-color: rgba(10, 10, 10, 0.9); border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; box-shadow: 0 8px 24px rgba(0,0,0,0.7); }
+    .combat-sprite-frame { width: 100%; height: 140px; display: flex; justify-content: center; align-items: center; overflow: hidden; margin-bottom: 12px; }
+    .combat-sprite-frame img { height: 100%; width: auto; object-fit: contain; }
+
+    /* ANIMATIONEN */
+    .attack-dash { animation: dashForward 0.35s cubic-bezier(0.25, 1, 0.5, 1); }
+    @keyframes dashForward { 0% { transform: translateX(0); } 30% { transform: translateX(80px) scale(1.05); } 100% { transform: translateX(0); } }
+    .enemy-hurt { animation: shakeHurt 0.3s linear; }
+    @keyframes shakeHurt { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+    .player-rolling { animation: dodgeRoll 0.4s ease-in-out; }
+    @keyframes dodgeRoll { 0% { transform: scaleY(1) translateY(0); opacity: 1; } 40% { transform: scaleY(0.6) translateY(30px) translateX(-20px); opacity: 0.6; } 100% { transform: scaleY(1) translateY(0); opacity: 1; } }
+
+    #battle-controls { background-color: rgba(12, 12, 12, 0.95); border: 1px solid var(--border-color); border-radius: 4px; padding: 15px; }
+    #battle-log { min-height: 50px; font-style: italic; font-size: 0.95rem; margin-bottom: 15px; white-space: pre-line; line-height: 1.4; }
+
+    .hp-container-with-text { width: 100%; position: relative; display: flex; align-items: center; justify-content: center; }
+    progress { -webkit-appearance: none; appearance: none; width: 100%; border-radius: 2px; border: 1px solid #000; box-sizing: border-box; }
+    .battle-arena progress { height: 26px; margin: 8px 0; border: 1px solid #111; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+    .bar-text-overlay { position: absolute; font-family: 'Cinzel', sans-serif; font-size: 0.85rem; font-weight: bold; color: #fff; text-shadow: 1px 1px 3px #000, -1px -1px 3px #000; pointer-events: none; }
+
+    .side-panel progress { height: 12px; margin: 6px 0; }
+    .player-progress::-webkit-progress-bar { background-color: #1a1a1a; }
+    .player-progress::-webkit-progress-value { background-color: #1e8449; }
+    .player-progress::-moz-progress-bar { background-color: #1e8449; }
+    .enemy-progress::-webkit-progress-bar { background-color: #1a1a1a; }
+    .enemy-progress::-webkit-progress-value { background-color: #922b21; }
+    .enemy-progress::-moz-progress-bar { background-color: #922b21; }
+
+    .btn-combat { padding: 14px 32px; font-family: 'Cinzel', serif; font-size: 1rem; font-weight: bold; cursor: pointer; border-radius: 3px; margin: 6px; transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1); text-transform: uppercase; letter-spacing: 2px; }
+    #atk-btn.btn-combat { background-color: #2c2214; color: var(--gold); border: 1px solid var(--gold); }
+    #atk-btn.btn-combat:hover { background-color: var(--gold); color: #0b0b0b; box-shadow: 0 0 20px rgba(205, 163, 79, 0.5); transform: translateY(-2px); }
+    .btn-heal { background-color: #141f19; color: #2ecc71; border: 1px solid #27ae60; }
+    .btn-heal:hover { background-color: #2ecc71; color: #0b0b0b; box-shadow: 0 0 20px rgba(46, 204, 113, 0.4); transform: translateY(-2px); }
+    
+    button.btn-modal-action {
+      background-color: #2c2214; color: var(--gold); border: 1px solid var(--gold);
+      padding: 10px 24px; font-family: 'Cinzel', serif; font-weight: bold; cursor: pointer;
+      margin-top: 15px; text-transform: uppercase; letter-spacing: 1px;
+    }
+    button.btn-modal-action:hover { background-color: var(--gold); color: #111; }
+  </style>
+</head>
+<body>
+
+<div id="game-container">
+  
+  <div id="popup-overlay" class="modal-overlay">
+    <div class="modal-content" id="popup-content"></div>
+  </div>
+
+  <div class="side-panel left-panel">
+    <h2>STATUS</h2>
+    <div class="player-card">
+      <div id="player-class-icon" style="font-size:2.5rem; margin-bottom:5px;">👑</div>
+      <div id="player-class-name">Befleckter</div>
+      <div id="player-weapon">Gebrochenes Schwert (+0)</div>
+      <progress id="player-hp-bar" class="player-progress" value="100" max="100"></progress>
+      <div id="player-hp-text">100 / 100 HP</div>
+      <div id="player-dodge-text" style="font-size: 0.85rem; color: var(--gold); margin-top: 5px;">Rolle: 30% Chance</div>
+      <div id="player-flasks" style="margin-top: 10px; font-weight: bold;">🧪 Flakons: 3</div>
+    </div>
+
+    <div class="player-card" style="border-color: var(--gold-dark);">
+      <div style="font-size: 0.75rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px;">Ausrüstung (Max 3)</div>
+      <div class="talisman-slot-row">
+        <div id="talisman-slot-0" class="talisman-item-inline" style="color:#666;">Slot 1: Leer</div>
+        <div id="talisman-slot-1" class="talisman-item-inline" style="color:#666;">Slot 2: Leer</div>
+        <div id="talisman-slot-2" class="talisman-item-inline" style="color:#666;">Slot 3: Leer</div>
+      </div>
+    </div>
+
+    <div class="player-card" style="border-color: var(--gold-dark);">
+      <div style="font-size: 0.75rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px;">Große Runen</div>
+      <div class="mini-runen-container">
+        <div id="mini-rune-godrick" class="mini-rune-slot" data-tooltip="Godricks Rune: +5% max. HP, +2 DMG und +5% Ausweichen">
+          <div class="mini-rune-img-frame"><img src="rune_godrick.png" alt="G"></div>
+          <div class="mini-rune-name">Godricks Rune</div>
+        </div>
+        <div id="mini-rune-radahn" class="mini-rune-slot" data-tooltip="Radahns Rune: +10% max. HP und +5 DMG">
+          <div class="mini-rune-img-frame"><img src="rune_radahn.png" alt="R"></div>
+          <div class="mini-rune-name">Radahns Rune</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="player-card" style="margin-top: auto; border-color: var(--gold-dark);">
+      <div style="font-size: 0.8rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px;">Aktuelles Gebiet</div>
+      <div id="region-display-name" style="font-weight: bold; color: var(--gold); margin-top: 5px; font-size: 1.1rem;">Limgrave</div>
+    </div>
+  </div>
+
+  <div class="main-panel">
+    <h1>ELDEN ROGUE</h1>
+    
+    <div id="battle-view" class="battle-arena" style="display: none;">
+      <div class="fighters-container">
+        <div class="fighter-wrapper" id="player-sprite-wrapper">
+          <strong style="color:var(--gold); font-size:0.9rem; letter-spacing:1px; margin-bottom:5px;">DU</strong>
+          <div class="hp-container-with-text">
+            <progress id="battle-player-hp" class="player-progress" value="100" max="100"></progress>
+            <span id="arena-player-hp-text" class="bar-text-overlay">100 / 100</span>
+          </div>
+          <div class="combat-sprite-frame">
+            <img id="player-combat-img" src="tarnished_ritter.png" alt="Tarnished">
+          </div>
+        </div>
+
+        <div class="fighter-wrapper" id="enemy-sprite-wrapper">
+          <strong id="arena-enemy-name" style="color:#e74c3c; font-size:0.9rem; letter-spacing:1px; margin-bottom:5px;">GEGNER</strong>
+          <div class="hp-container-with-text">
+            <progress id="enemy-hp-bar" class="enemy-progress" value="100" max="100"></progress>
+            <span id="arena-enemy-hp-text" class="bar-text-overlay">40 / 40</span>
+          </div>
+          <div class="combat-sprite-frame">
+            <img id="enemy-img" src="" alt="Gegner">
+          </div>
+        </div>
+      </div>
+      
+      <div id="battle-controls">
+        <div id="battle-log">Kampfprotokoll...</div>
+        <div class="battle-buttons" style="text-align: center;">
+          <button id="atk-btn" class="btn-combat" onclick="spielerAngriff()">⚔️ Angreifen</button>
+          <button class="btn-combat btn-heal" onclick="spielerHeilen()">🧪 Heilen</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="map-wrapper-relative">
+      <div id="map-view" class="map-scroll-area">
+        <div id="map-grid"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let spielerHp = 100; let spielerMaxHp = 100; let spielerFlasks = 3; let estusHeilwert = 40; let gewaehlteKlasse = ""; let basisAusweichChance = 0.0;
+let waffenName = "Gebrochenes Schwert"; let waffenSchaden = 12; let waffenUpgrade = 0;
+let ausgeruesteteTalismane = []; let hatGodrickRune = false; let hatRadahnRune = false; let aktiveRune = "keine";
+let imKampf = false; let gegnerName = ""; let gegnerHp = 0; let gegnerMaxHp = 0; let gegnerSchaden = 0; let aktuellerKnotenTyp = 0;
+let charakterKampfBild = "tarnished_ritter.png"; // Dynamischer Starter-Wechsler
+
+const nahkampfPool = [{ name: "Uchigatana", dmg: 22 }, { name: "Großschwert", dmg: 28 }, { name: "Bluthundreißzahn", dmg: 25 }, { name: "Riesenklinge", dmg: 30 }];
+const magiePool = [{ name: "Schimmersteinstab", dmg: 21 }, { name: "Carianischer Stoß", dmg: 24 }, { name: "Mondschleier-Katana", dmg: 29 }, { name: "Meteoritenstab", dmg: 32 }];
+const talismanPool = [{ id: "axe", name: "Axt-Talisman", desc: "Erhöht Schaden um +5." }, { id: "shield", name: "Drachengroßschild", desc: "Reduziert erlittenen Schaden um -2." }, { id: "toad", name: "Flugkröten-Talisman", desc: "Erhöht Rollen-Chance um +8%." }, { id: "curse", name: "Daedic-Insignie (Fluch)", desc: "Fluch! Du erleidest +3 Schaden." }];
+
+// ABSTIMMUNG AUF DEINEN LOCAL FILE TREE
+const bilderDatenbank = {
+  "Godrick-Soldat": "soldat.png", "Radahn-Ritter": "soldat.png", "Leyndell-Ritter": "soldat.png", "Finsterer Geist Nerijus": "nerijus.png",
+  "Godrick, der Gepfropfte": "godrick.webp", "Sternengeißel Radahn": "radahn.png", "Morgott, der Omenkönig": "morgott.png",
+  "Feuerriese (Fire Giant)": "firegiant.png", "Maliketh, die Schwarze Klinge": "maliketh.png"
+};
+
+// Festgelegte Webp-Dateien für deine Kartensymbole laut Screenshot!
+const bDatenbankHTML = {
+  1: "icon_elite.webp", 2: "icon_loot.webp", 3: "icon_invader.webp",
+  4: "icon_grace.webp", 5: "icon_boss", 6: "icon_talisman.png", // PNG-Ausnahme beachtet
+  7: "icon_tree.webp", 8: "icon_tower.webp"
+};
+
+const beschreibungen = {
+  1: "🦏 Elite-Feind: Besiege ihn für +10% max. Leben", 2: "📦 Gebiet looten: Wähle zwischen zwei Waffen aus", 3: "🔴 Invader besiegen: Garantiert dir ein Waffen-Upgrade (+1)",
+  4: "✨ Ort der Gnade: Vollständige Regeneration vor dem Boss", 5: "👑 Der große Halbgott dieses Gebiets!", 6: "💍 Schatztruhe öffnen: Enthält einen zufälligen Talisman",
+  7: "🌳 Goldener Erdenbaum: Erhalte +1 Flakon und +10% Estus-Effizienz", 8: "☤ Heiliger Turm: Betrete den Turm, um eine Rune aktiv auszuwählen!"
+};
+
+const pfadePool = [1, 2, 3, 6, 7];
+let aktuelleRegion = "Limgrave"; let aktuelleEbene = 1; let geloesieKnotenIds = []; let aktuellerKnotenId = null; let netzKarte = [];
+
+function generiereRautenNetz(regionName) {
+  let layout = [2, 3, 4, 3, 2, 2, 1]; let temporaereKarte = [];
+  for (let e = 0; e < layout.length; e++) {
+    let anzahlKnoten = layout[e]; let ebeneNummer = e + 1; let knotenArray = [];
+    for (let k = 0; k < anzahlKnoten; k++) {
+      let typ = pfadePool[Math.floor(Math.random() * pfadePool.length)];
+      if (ebeneNummer === 2 && k === 0 && (hatGodrickRune || hatRadahnRune)) { typ = 8; }
+      if (ebeneNummer === 6) { if (k === 0) { typ = 4; } else { typ = pfadePool[Math.floor(Math.random() * pfadePool.length)]; } }
+      if (ebeneNummer === 7) { typ = 5; }
+      
+      let verknuepfungen = []; let naechsteAnzahl = layout[e + 1] || 0;
+      if (naechsteAnzahl > 0) {
+        if (anzahlKnoten === 2 && naechsteAnzahl === 3) { if (k === 0) verknuepfungen = [0, 1]; if (k === 1) verknuepfungen = [1, 2]; } 
+        else if (anzahlKnoten === 3 && naechsteAnzahl === 4) { if (k === 0) verknuepfungen = [0, 1]; if (k === 1) verknuepfungen = [1, 2]; if (k === 2) verknuepfungen = [2, 3]; } 
+        else if (anzahlKnoten === 4 && naechsteAnzahl === 3) { if (k === 0) verknuepfungen = [0]; if (k === 1) verknuepfungen = [0, 1]; if (k === 2) verknuepfungen = [1, 2]; if (k === 3) verknuepfungen = [2]; } 
+        else if (anzahlKnoten === 3 && naechsteAnzahl === 2) { if (k === 0) verknuepfungen = [0]; if (k === 1) verknuepfungen = [0, 1]; if (k === 2) verknuepfungen = [1]; } 
+        else if (anzahlKnoten === 2 && naechsteAnzahl === 2) { if (k === 0) verknuepfungen = [0]; if (k === 1) verknuepfungen = [1]; } 
+        else if (anzahlKnoten === 2 && naechsteAnzahl === 1) { verknuepfungen = [0]; }
+      }
+      knotenArray.push({ id: regionName.substring(0,3) + "_" + ebeneNummer + "_" + k, index: k, typ: typ, wege: verknuepfungen });
+    }
+    temporaereKarte.push({ ebene: ebeneNummer, knoten: knotenArray });
+  }
+  return temporaereKarte;
+}
+
+window.onload = function() {
+  netzKarte = generiereRautenNetz("Limgrave");
+  baueKarteHTML();
+
+  let popUp = document.getElementById("popup-content");
+  popUp.innerHTML = `
+    <h2 style="color: var(--gold); font-size: 1.8rem; margin-top:0; letter-spacing:3px;">ELDEN ROGUE</h2>
+    <p style="color: #aaa; font-style: italic; font-size:0.95rem;">Wähle deine Klasse, Befleckter...</p>
+    <div class="class-selection">
+      <div class="class-card" onclick="waehleKlasseEngine('magier')">
+        <div style="font-size: 2.5rem;">🧙‍♂️</div><div style="font-weight:bold; color:#fff; mt:5px;">Astrologe</div>
+        <div style="font-size:0.85rem; color:var(--gold); mt:8px;">80 HP | 40% Rolle<br>Schimmerkiesel</div>
+      </div>
+      <div class="class-card" onclick="waehleKlasseEngine('schwertkaempfer')">
+        <div style="font-size: 2.5rem;">⚔️</div><div style="font-weight:bold; color:#fff; mt:5px;">Vagabund</div>
+        <div style="font-size:0.85rem; color:var(--gold); mt:8px;">120 HP | 30% Rolle<br>Langschwert</div>
+      </div>
+      <div class="class-card" onclick="waehleKlasseEngine('nackt')">
+        <div style="font-size: 2.5rem;">🪵</div><div style="font-weight:bold; color:#fff; mt:5px;">Bettler</div>
+        <div style="font-size:0.85rem; color:var(--gold); mt:8px;">90 HP | 50% Rolle<br>Holzkeule</div>
+      </div>
+    </div>`;
+};
+
+function waehleKlasseEngine(klasse) {
+  gewaehlteKlasse = klasse;
+  if (klasse === 'magier') { spielerMaxHp = 80; spielerFlasks = 2; waffenName = "Schimmerkiesel-Zauber"; waffenSchaden = 14; basisAusweichChance = 0.40; charakterKampfBild = "tarnished_magier.png"; } 
+  else if (klasse === 'schwertkaempfer') { spielerMaxHp = 120; spielerFlasks = 3; waffenName = "Gerades Langschwert"; waffenSchaden = 11; basisAusweichChance = 0.30; charakterKampfBild = "tarnished_ritter.png"; } 
+  else if (klasse === 'nackt') { spielerMaxHp = 90; spielerFlasks = 1; waffenName = "Einfache Holzkeule"; waffenSchaden = 9; basisAusweichChance = 0.50; charakterKampfBild = "tarnished_nackt.png"; }
+  spielerHp = spielerMaxHp; document.getElementById("popup-overlay").style.display = "none"; updateUI();
+}
+
+function baueKarteHTML() {
+  let grid = document.getElementById("map-grid"); if (!grid) return;
+  grid.innerHTML = "";
+  let mapScrollArea = document.getElementById("map-view");
+  
+  if (aktuelleRegion === "Limgrave") mapScrollArea.style.backgroundImage = "var(--map-overlay), url('limgrave.jpg')";
+  if (aktuelleRegion === "Caelid") mapScrollArea.style.backgroundImage = "linear-gradient(to bottom, rgba(5,5,5,0.75), rgba(5,5,5,0.85)), url('caelid.jpg')";
+  if (aktuelleRegion === "Leyndell") mapScrollArea.style.backgroundImage = "linear-gradient(to bottom, rgba(5,5,5,0.75), rgba(5,5,5,0.85)), url('leyndell.jpg')";
+  if (aktuelleRegion === "Mountaintops") mapScrollArea.style.backgroundImage = "linear-gradient(to bottom, rgba(5,5,5,0.75), rgba(5,5,5,0.85)), url('mountaintops.jpg')";
+  if (aktuelleRegion === "FarumAzula") mapScrollArea.style.backgroundImage = "linear-gradient(to bottom, rgba(5,5,5,0.75), rgba(5,5,5,0.85)), url('farumazula.jpg')";
+
+  netzKarte.forEach(zeile => {
+    let rowDiv = document.createElement("div"); rowDiv.classList.add("map-row");
+    zeile.knoten.forEach(knoten => {
+      let nodeDiv = document.createElement("div"); nodeDiv.classList.add("map-node"); nodeDiv.id = knoten.id;
+      nodeDiv.setAttribute("data-tooltip", beschreibungen[knoten.typ] || "Boss-Kampf");
+      
+      let imgTag = document.createElement("img");
+      imgTag.classList.add("map-node-img");
+      
+      if (knoten.typ === 5) {
+        if (aktuelleRegion === "Limgrave") imgTag.src = "icon_boss_godrick.webp";
+        else if (aktuelleRegion === "Caelid") imgTag.src = "icon_boss_radahn.webp";
+        else if (aktuelleRegion === "Leyndell") imgTag.src = "icon_boss_morgott.webp";
+        else if (aktuelleRegion === "Mountaintops") imgTag.src = "icon_boss_giant.webp";
+        else imgTag.src = "icon_boss_maliketh.webp";
+      } else {
+        imgTag.src = bDatenbankHTML[knoten.typ] || "icon_loot.webp";
+      }
+      nodeDiv.appendChild(imgTag);
+
+      let istGeloest = geloesieKnotenIds.includes(knoten.id); let istWaehlbar = false;
+      if (gewaehlteKlasse !== "" && !imKampf && !istGeloest && spielerHp > 0) {
+        if (aktuelleEbene === 1 && zeile.ebene === 1) istWaehlbar = true;
+        else if (zeile.ebene === aktuelleEbene) {
+          let vorherigeEbeneKnoten = netzKarte[aktuelleEbene - 2]?.knoten;
+          if (vorherigeEbeneKnoten) {
+            let alterKnoten = vorherigeEbeneKnoten.find(k => k.id === aktuellerKnotenId);
+            if (alterKnoten && alterKnoten.wege.includes(knoten.index)) istWaehlbar = true;
+          }
+        }
+      }
+      if (istGeloest) { nodeDiv.classList.add("completed"); } 
+      else if (knoten.id === aktuellerKnotenId) nodeDiv.classList.add("current-pos");
+      else if (istWaehlbar) { nodeDiv.classList.add("selectable"); nodeDiv.onclick = () => klickeKnoten(zeile.ebene, knoten); }
+      rowDiv.appendChild(nodeDiv);
+    });
+    grid.appendChild(rowDiv);
+  });
+}
+
+function updateUI() {
+  if (gewaehlteKlasse === "") return; let tStats = berechneTalismanStats();
+  let runeHpBonus = 0; let runeDmgBonus = 0; let runeRollBonus = 0.0;
+  if (aktiveRune === "godrick") { runeHpBonus += Math.round(spielerMaxHp * 0.05); runeDmgBonus += 2; runeRollBonus += 0.05; }
+  if (aktiveRune === "radahn")  { runeHpBonus += Math.round(spielerMaxHp * 0.10); runeDmgBonus += 5; }
+  let finaleAusweichChance = Math.min(0.85, basisAusweichChance + tStats.extraRolle + runeRollBonus);
+  let finalMaxHp = spielerMaxHp + runeHpBonus; let finalDmg = waffenSchaden + (waffenUpgrade * 5) + tStats.bonusSchaden + runeDmgBonus;
+
+  document.getElementById("player-hp-bar").max = finalMaxHp; document.getElementById("player-hp-bar").value = spielerHp;
+  document.getElementById("player-hp-text").innerText = `${spielerHp} / ${finalMaxHp} HP`;
+  document.getElementById("player-flasks").innerText = `🧪 Flakons: ${spielerFlasks} (Heilung: ${estusHeilwert})`;
+  document.getElementById("player-weapon").innerText = `${waffenName} (+${waffenUpgrade}) [Dmg: ${finalDmg}]`;
+  document.getElementById("player-dodge-text").innerText = `Rolle: ${Math.round(finaleAusweichChance * 100)}% Chance`;
+  
+  for(let i=0; i<3; i++) {
+    let slotDiv = document.getElementById(`talisman-slot-${i}`);
+    if (ausgeruesteteTalismane[i]) { slotDiv.innerText = `💍 ${ausgeruesteteTalismane[i].name}`; slotDiv.style.color = "#2ecc71"; } 
+    else { slotDiv.innerText = `Slot ${i+1}: Leer`; slotDiv.style.color = "#666"; }
+  }
+
+  let mGodrick = document.getElementById("mini-rune-godrick"); mGodrick.className = "mini-rune-slot";
+  if (hatGodrickRune) { mGodrick.classList.add("unlocked"); if (aktiveRune === "godrick") mGodrick.classList.add("active"); }
+  let mRadahn = document.getElementById("mini-rune-radahn"); mRadahn.className = "mini-rune-slot";
+  if (hatRadahnRune) { mRadahn.classList.add("unlocked"); if (aktiveRune === "radahn") mRadahn.classList.add("active"); }
+
+  let areaText = aktuelleRegion; if (areaText === "FarumAzula") areaText = "Farum Azula";
+  document.getElementById("region-display-name").innerText = areaText;
+
+  if (imKampf) {
+    // FIXED: Arena-Hintergrundbild passt sich live an das aktuelle Gebiet an!
+    let arenaDiv = document.getElementById("battle-view");
+    if (aktuelleRegion === "Limgrave") arenaDiv.style.backgroundImage = "linear-gradient(to bottom, rgba(5,5,5,0.4), rgba(5,5,5,0.7)), url('limgrave.jpg')";
+    if (aktuelleRegion === "Caelid") arenaDiv.style.backgroundImage = "linear-gradient(to bottom, rgba(5,5,5,0.4), rgba(5,5,5,0.7)), url('caelid.jpg')";
+    if (aktuelleRegion === "Leyndell") arenaDiv.style.backgroundImage = "linear-gradient(to bottom, rgba(5,5,5,0.4), rgba(5,5,5,0.7)), url('leyndell.jpg')";
+    if (aktuelleRegion === "Mountaintops") arenaDiv.style.backgroundImage = "linear-gradient(to bottom, rgba(5,5,5,0.4), rgba(5,5,5,0.7)), url('mountaintops.jpg')";
+    if (aktuelleRegion === "FarumAzula") arenaDiv.style.backgroundImage = "linear-gradient(to bottom, rgba(5,5,5,0.4), rgba(5,5,5,0.7)), url('farumazula.jpg')";
+
+    arenaDiv.style.display = "flex"; document.getElementById("map-view").style.display = "none";
+    document.getElementById("battle-player-hp").max = finalMaxHp; document.getElementById("battle-player-hp").value = spielerHp;
+    document.getElementById("arena-player-hp-text").innerText = `${spielerHp} / ${finalMaxHp}`;
+    document.getElementById("enemy-hp-bar").max = gegnerMaxHp; document.getElementById("enemy-hp-bar").value = gegnerHp;
+    document.getElementById("arena-enemy-hp-text").innerText = `${gegnerHp} / ${gegnerMaxHp}`;
+    document.getElementById("arena-enemy-name").innerText = gegnerName; document.getElementById("enemy-img").src = bilderDatenbank[gegnerName] || "";
+    
+    // Dynamischer Klassen-Sprite-Wechsler
+    document.getElementById("player-combat-img").src = charakterKampfBild;
+  } else { document.getElementById("battle-view").style.display = "none"; document.getElementById("map-view").style.display = "flex"; }
+  baueKarteHTML();
+}
+
+function klickeKnoten(ebene, knoten) {
+  if (imKampf || spielerHp <= 0) return;
+  geloesieKnotenIds.push(knoten.id); aktuellerKnotenId = knoten.id; aktuellerKnotenTyp = knoten.typ;
+  if (knoten.typ === 4) {
+    let runeHpBonus = (aktiveRune === "godrick" ? Math.round(spielerMaxHp * 0.05) : 0) + (aktiveRune === "radahn" ? Math.round(spielerMaxHp * 0.1) : 0);
+    spielerHp = spielerMaxHp + runeHpBonus; spielerFlasks = 3 + Math.floor((spielerMaxHp - 100) / 20);
+    oeffneStatPopup("✨ Segen der Gnade", "Du rastest am Ort der Gnade.\nDeine Lebenskraft und Flakons wurden vollständig regeneriert!", ebene + 1); return;
+  }
+  if (knoten.typ === 6) { oeffneTalismanPopup(ebene + 1); return; }
+  if (knoten.typ === 7) {
+    spielerFlasks += 1; estusHeilwert = Math.round(estusHeilwert * 1.1);
+    oeffneStatPopup("🌳 Goldene Saat gefunden", `Du stehst vor einem leuchtenden Erdenbaum-Sprössling.\n\nEffekt:\n🧪 +1 Flakon\n🧪 Heilung effektiv erhöht auf ${estusHeilwert} HP!`, ebene + 1); return;
+  }
+  if (knoten.typ === 8) { oeffneTowerSelectionMenu(ebene + 1); return; }
+
+  let rMult = 1; if (aktuelleRegion === "Caelid") rMult = 1.7; if (aktuelleRegion === "Leyndell") rMult = 2.4; if (aktuelleRegion === "Mountaintops") rMult = 3.2; if (aktuelleRegion === "FarumAzula") rMult = 4.0;
+  if (knoten.typ === 1) { gegnerName = aktuelleRegion === "Limgrave" ? "Baumwächter-Lehrling" : (aktuelleRegion === "Caelid" ? "Radahn-Ritter" : "Leyndell-Ritter"); gegnerMaxHp = Math.round(50 * rMult); gegnerSchaden = Math.round(9 * rMult); } 
+  else if (knoten.typ === 2) { gegnerName = "Godrick-Soldat"; gegnerMaxHp = Math.round(28 * rMult); gegnerSchaden = Math.round(6 * rMult); } 
+  else if (knoten.typ === 3) { gegnerName = "Finsterer Geist Nerijus"; gegnerMaxHp = Math.round(60 * rMult); gegnerSchaden = Math.round(12 * rMult); } 
+  else if (knoten.typ === 5) {
+    if (aktuelleRegion === "Limgrave") { gegnerName = "Godrick, der Gepfropfte"; gegnerMaxHp = 250; gegnerSchaden = 20; }
+    if (aktuelleRegion === "Caelid") { gegnerName = "Sternengeißel Radahn"; gegnerMaxHp = 450; gegnerSchaden = 32; }
+    if (aktuelleRegion === "Leyndell") { gegnerName = "Morgott, der Omenkönig"; gegnerMaxHp = 680; gegnerSchaden = 45; }
+    if (aktuelleRegion === "Mountaintops") { gegnerName = "Feuerriese (Fire Giant)"; gegnerMaxHp = 920; gegnerSchaden = 58; }
+    if (aktuelleRegion === "FarumAzula") { gegnerName = "Maliketh, die Schwarze Klinge"; gegnerMaxHp = 1350; gegnerSchaden = 75; }
+  }
+  gegnerHp = gegnerMaxHp; imKampf = true; document.getElementById("battle-log").innerText = `Du forderst heraus: ${gegnerName}!`; updateUI();
+}
+
+function oeffneTowerSelectionMenu(naechsteEbene) {
+  let overlay = document.getElementById("popup-overlay"); let content = document.getElementById("popup-content");
+  let godrickClass = hatGodrickRune ? "tower-rune-option unlocked" : "tower-rune-option"; if (aktiveRune === "godrick") godrickClass += " active";
+  let radahnClass = hatRadahnRune ? "tower-rune-option unlocked" : "tower-rune-option"; if (aktiveRune === "radahn") radahnClass += " active";
+  content.innerHTML = `<h3 style="color: var(--gold); font-size:1.6rem; margin-top:0; letter-spacing:2px;">☤ Der Heilige Turm</h3><p style="color:#aaa; font-size:0.9rem; margin-bottom:20px;">Wähle eine erbeutete Große Rune, um sie an diesem Altar exklusiv zu aktivieren.</p><div class="tower-selection-container"><div class="${godrickClass}" onclick="${hatGodrickRune ? "waehleTurmRune('godrick')" : ""}"><strong>Godricks Große Rune</strong> ${aktiveRune==='godrick'?'[AKTIV]':''}<div style="font-size:0.8rem; color:#888; margin-top:4px;">Attribute: +5% max HP, +2 Schaden, +5% Roll-Erfolg.</div></div><div class="${radahnClass}" onclick="${hatRadahnRune ? "waehleTurmRune('radahn')" : ""}"><strong>Radahns Große Rune</strong> ${aktiveRune==='radahn'?'[AKTIV]':''}<div style="font-size:0.8rem; color:#888; margin-top:4px;">Gestirne: Verleiht dir +10% maximale HP und +5 Waffenschaden.</div></div></div><button class="btn-modal-action" onclick="bestaetigeStufe(${naechsteEbene}, 'Turm verlassen')">Turm verlassen ➔</button>`;
+  overlay.style.display = "flex";
+}
+
+function waehleTurmRune(runeKey) { aktiveRune = runeKey; let naechste = aktuelleEbene + 1; oeffneTowerSelectionMenu(naechste); }
+
+function spielerAngriff() {
+  if (!imKampf || spielerHp <= 0) return;
+  let playerWrapper = document.getElementById("player-sprite-wrapper"); let enemyWrapper = document.getElementById("enemy-sprite-wrapper");
+  playerWrapper.classList.add("attack-dash");
+  let tStats = berechneTalismanStats(); let runeDmgBonus = aktiveRune === "godrick" ? 2 : (aktiveRune === "radahn" ? 5 : 0);
+  let schaden = waffenSchaden + (waffenUpgrade * 5) + tStats.bonusSchaden + runeDmgBonus + Math.floor(Math.random() * 5) - 2;
+  gegnerHp = Math.max(0, gegnerHp - schaden);
+
+  setTimeout(() => { enemyWrapper.classList.add("enemy-hurt"); document.getElementById("battle-log").innerText = `Du führst ${waffenName} aus und triffst für ${schaden} Schaden!`; updateUI(); }, 150);
+  setTimeout(() => { playerWrapper.classList.remove("attack-dash"); enemyWrapper.classList.remove("enemy-hurt"); if (gegnerHp <= 0) { kampfGewonnen(); } }, 350);
+
+  setTimeout(() => {
+    if (gegnerHp <= 0 || spielerHp <= 0) return;
+    enemyWrapper.style.transform = "translateX(-40px)"; let runeRollBonus = aktiveRune === "godrick" ? 0.05 : 0.0;
+    let finaleAusweichChance = Math.min(0.85, basisAusweichChance + tStats.extraRolle + runeRollBonus);
+    let wuerfel = Math.random(); let ausgewichen = wuerfel < finaleAusweichChance;
+
+    setTimeout(() => {
+      enemyWrapper.style.transform = "translateX(0)";
+      if (ausgewichen) { playerWrapper.classList.add("player-rolling"); document.getElementById("battle-log").innerText += `\n💨 Rollen-Erfolg! Du weichst dem Hieb komplett aus!`; updateUI(); } 
+      else {
+        let gSchaden = gegnerSchaden + tStats.fluch - tStats.resistenz + Math.floor(Math.random() * 4) - 1; gSchaden = Math.max(2, gSchaden);
+        spielerHp = Math.max(0, spielerHp - gSchaden); playerWrapper.classList.add("enemy-hurt"); 
+        document.getElementById("battle-log").innerText += `\n${gegnerName} erwischt dich am Ende der Rolle für ${gSchaden} Schaden!`; updateUI();
+      }
+    }, 150);
+    setTimeout(() => { playerWrapper.classList.remove("enemy-hurt"); playerWrapper.classList.remove("player-rolling"); if (spielerHp <= 0) { document.getElementById("battle-log").innerText = "💀 DU BIST GESTORBEN."; } }, 450);
+  }, 700);
+}
+
+function spielerHeilen() {
+  if (!imKampf || spielerHp <= 0) return;
+  if (spielerFlasks > 0) {
+    let runeHpBonus = (aktiveRune === "godrick" ? Math.round(spielerMaxHp * 0.05) : 0) + (aktiveRune === "radahn" ? Math.round(spielerMaxHp * 0.1) : 0);
+    spielerHp = Math.min(spielerMaxHp + runeHpBonus, spielerHp + estusHeilwert); spielerFlasks--;
+    document.getElementById("battle-log").innerText = `🧪 Flakon getrunken! +${estusHeilwert} HP.`; updateUI();
+    let playerWrapper = document.getElementById("player-sprite-wrapper"); let enemyWrapper = document.getElementById("enemy-sprite-wrapper");
+
+    setTimeout(() => {
+      if (gegnerHp <= 0 || spielerHp <= 0) return;
+      let tStats = berechneTalismanStats(); let runeRollBonus = aktiveRune === "godrick" ? 0.05 : 0.0;
+      let finaleAusweichChance = Math.min(0.85, basisAusweichChance + tStats.extraRolle + runeRollBonus);
+      let wuerfel = Math.random(); let ausgewichen = wuerfel < finaleAusweichChance;
+
+      if (ausgewichen) { playerWrapper.classList.add("player-rolling"); document.getElementById("battle-log").innerText += `\n💨 Elegant rollst du dich während des Trinkens unter dem Schlag weg!`; updateUI(); } 
+      else {
+        let gSchaden = gegnerSchaden + tStats.fluch - tStats.resistenz + Math.floor(Math.random() * 3); gSchaden = Math.max(2, gSchaden); spielerHp = Math.max(0, spielerHp - gSchaden);
+        playerWrapper.classList.add("enemy-hurt"); document.getElementById("battle-log").innerText += `\n${gegnerName} bestraft das Heilen: ${gSchaden} Schaden!`; updateUI();
+      }
+      setTimeout(() => { playerWrapper.classList.remove("enemy-hurt"); playerWrapper.classList.remove("player-rolling"); }, 450);
+    }, 400);
+  }
+}
+
+function kampfGewonnen() {
+  imKampf = false;
+  if (gegnerName === "Godrick, der Gepfropfte") {
+    hatGodrickRune = true; aktuelleRegion = "Caelid"; aktuelleEbene = 1; geloesieKnotenIds = []; waffenUpgrade += 2; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("Caelid");
+    oeffneStatPopup("👑 STURMSCHLEIER GEMEISTERT", "Godrick ist zerschmettert!\nDu erbeutest seine Große Rune.\n\nEin neuer Pfad öffnet sich: Das vom Scharlach verrottete Ödland... CAELID!", 1); return;
+  }
+  if (gegnerName === "Sternengeißel Radahn") {
+    hatRadahnRune = true; aktuelleRegion = "Leyndell"; aktuelleEbene = 1; geloesieKnotenIds = []; waffenUpgrade += 2; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("Leyndell");
+    oeffneStatPopup("🌌 DIE STERNE FALLEN", "Du hast Radahn bezwungen!\nDas Schicksal setzt sich wieder in Bewegung.\n\nDein nächstes Ziel ist die goldene Hauptstadt... LEYNDELL!", 1); return;
+  }
+  if (gegnerName === "Morgott, der Omenkönig") {
+    aktuelleRegion = "Mountaintops"; aktuelleEbene = 1; geloesieKnotenIds = []; waffenUpgrade += 2; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("Mountaintops");
+    oeffneStatPopup("⚔️ KÖNIG DES OMENS GEFALLEN", "Morgott löst sich in Goldstaub auf!\n\nDer Weg führt dich nun hinauf in die eisigen, gefährlichen Höhen...\nMOUNTAINTOPS OF THE GIANTS!", 1); return;
+  }
+  if (gegnerName === "Feuerriese (Fire Giant)") {
+    aktuelleRegion = "FarumAzula"; aktuelleEbene = 1; geloesieKnotenIds = []; waffenUpgrade += 3; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("FarumAzula");
+    oeffneStatPopup("🔥 DIE SCHMIEDE DER RIESEN ENTFLAMMT", "Der letzte Riese bricht im Schnee zusammen!\n\nEin Riss im Raum wirft dich in das zerfallende, zeitlose Himmelsreich...\nCRUMBLING FARUM AZULA!", 1); return;
+  }
+  if (gegnerName === "Maliketh, die Schwarze Klinge") { oeffneStatPopup("🐕 TOD DER SCHWARZEN KLINGE", "Maliketh stürzt krachend zu Boden. Die Klinge des Schicksals gehört dir!\n\nHewie verbeugt sich vor dem neuen ELDEN LORD! GGG!", 8); return; }
+
+  let naechsteEbene = aktuelleEbene + 1;
+  if (aktuellerKnotenTyp === 1) {
+    let hpBonus = Math.round(spielerMaxHp * 0.1); spielerMaxHp += hpBonus; spielerHp += hpBonus;
+    oeffneStatPopup("🦏 Feind zermalmt!", `Der Wächter schwindet.\nDeine maximale Lebenskraft erhöht sich um +10% (+${hpBonus} HP)!`, naechsteEbene);
+  } 
+  else if (aktuellerKnotenTyp === 3) { waffenUpgrade++; oeffneStatPopup("🔴 Invasion abgewehrt!", `Der rote Finstergeist zerfällt.\nDeine Waffe steigt auf +${waffenUpgrade}!`, naechsteEbene); } 
+  else if (aktuellerKnotenTyp === 2) { oeffneLootPopup(naechsteEbene); }
+}
+
+function berechneTalismanStats() {
+  let stats = { bonusSchaden: 0, resistenz: 0, extraRolle: 0.0, fluch: 0 };
+  ausgeruesteteTalismane.forEach(t => {
+    if (t.id === "axe") stats.bonusSchaden += 5; if (t.id === "shield") stats.resistenz += 2; if (t.id === "toad") stats.extraRolle += 0.08; if (t.id === "curse") stats.fluch += 3;
+  });
+  return stats;
+}
+
+function oeffneStatPopup(titel, text, naechsteEbene) {
+  let overlay = document.getElementById("popup-overlay"); let content = document.getElementById("popup-content");
+  content.innerHTML = `<h3 style="color: var(--gold); font-size:1.5rem; margin-top:0; letter-spacing:1px;">${titel}</h3><p style="white-space:pre-line; color:#ddd; font-size:0.95rem; line-height:1.4;">${text}</p><button class="btn-modal-action" onclick="bestaetigeStufe(${naechsteEbene}, '${titel}')">Reise fortsetzen ➔</button>`;
+  overlay.style.display = "flex";
+}
+
+function oeffneTalismanPopup(naechsteEbene) {
+  let overlay = document.getElementById("popup-overlay"); let content = document.getElementById("popup-content");
+  let randomTalismanBase = talismanPool[Math.floor(Math.random() * talismanPool.length)]; let neuerTalisman = { id: randomTalismanBase.id, name: randomTalismanBase.name, desc: randomTalismanBase.desc };
+  if (ausgeruesteteTalismane.length < 3) ausgeruesteteTalismane.push(neuerTalisman); else { ausgeruesteteTalismane.shift(); ausgeruesteteTalismane.push(neuerTalisman); }
+  content.innerHTML = `<h3 style="color: #ede6d4; font-size:1.5rem; margin-top:0; letter-spacing:1px;">💍 Steingrab geplündert!</h3><p style="color:#aaa; font-size:0.95rem;">Du musst diesen Gegenstand anlegen:</p><div style="background-color:#111; border: 1px solid var(--gold); padding:20px; border-radius:4px; margin:20px 0;"><h4 style="color:var(--gold); margin:0 0 5px 0; font-size:1.1rem;">💍 ${neuerTalisman.name}</h4><p style="font-size:0.85rem; color:#eee; font-style:italic; margin:0;">${neuerTalisman.desc}</p></div><button class="btn-modal-action" onclick="bestaetigeStufe(${naechsteEbene}, 'Talisman gebunden')">Effekt binden ➔</button>`;
+  overlay.style.display = "flex";
+}
+
+function oeffneLootPopup(naechsteEbene) {
+  let overlay = document.getElementById("popup-overlay"); let content = document.getElementById("popup-content");
+  let waffenPoolKopie = gewaehlteKlasse === 'magier' ? [...magiePool] : [...nahkampfPool];
+  let w1 = waffenPoolKopie.splice(Math.floor(Math.random() * waffenPoolKopie.length), 1)[0]; let w2 = waffenPoolKopie.splice(Math.floor(Math.random() * waffenPoolKopie.length), 1)[0];
+  let dmg1 = w1.dmg + Math.floor(Math.random() * 5); let dmg2 = w2.dmg + Math.floor(Math.random() * 5);
+  content.innerHTML = `<h3 style="color: var(--gold); font-size:1.5rem; margin-top:0; letter-spacing:1px;">📦 Schätze der Ruinen</h3><p style="color:#aaa; font-size:0.95rem;">Wähle eine Waffe:</p><div class="loot-options-container"><div class="loot-card" onclick="rusteWaffeAus('${w1.name}', ${dmg1}, ${naechsteEbene})"><div style="font-weight:bold; color:#fff;">${w1.name}</div><div style="color:#2ecc71; margin-top:8px; font-size:0.9rem;">Schaden: ${dmg1}</div></div><div class="loot-card" onclick="rusteWaffeAus('${w2.name}', ${dmg2}, ${naechsteEbene})"><div style="font-weight:bold; color:#fff;">${w2.name}</div><div style="color:#2ecc71; margin-top:8px; font-size:0.9rem;">Schaden: ${dmg2}</div></div></div><button style="background-color:#222; color:#aaa; border-color:#444;" class="btn-modal-action" onclick="bestaetigeStufe(${naechsteEbene}, 'Beute ignoriert')">Behalten</button>`;
+  overlay.style.display = "flex";
+}
+
+function rusteWaffeAus(name, dmg, naechsteEbene) { waffenName = name; waffenSchaden = dmg; bestaetigeStufe(naechsteEbene, `Waffe ausgerüstet`); }
+function bestaetigeStufe(naechsteEbene, logMeldung) { document.getElementById("popup-overlay").style.display = "none"; aktuelleEbene = naechsteEbene; updateUI(); }
+</script>
+</body>
+</html>
