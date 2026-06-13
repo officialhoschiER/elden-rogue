@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Elden Rogue - Hauptmenü</title>
+  <link rel="icon" type="image/png" href="images/favicon.png">
+  
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="lang.js"></script>
+  <script src="eldenrogue-online.js"></script>
+  
+  <style>
+    @font-face { font-family: 'Mantinia'; src: url('fonts/Mantinia Regular.otf') format('opentype'); font-weight: normal; font-style: normal; }
+    :root { --gold: #cda34f; --gold-dark: #8c6d2d; --bg-dark: #0b0b0b; --border-color: #3a3224; --panel: #161616; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-dark); color: #ede6d4; font-family: 'Georgia', serif;
+      min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background-image: linear-gradient(to bottom, rgba(5,5,5,0.7), rgba(5,5,5,0.92) 60%, rgba(5,5,5,1)),
+                         url('images/limgrave.jpg');
+      background-size: cover; background-position: center top; background-attachment: fixed;
+    }
+
+    /* ===== ABSOLUTER SPRACHSCHALTER OBEN RECHTS ===== */
+    .global-lang-switcher {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      display: flex;
+      gap: 4px;
+      background: #0e0e0e;
+      border: 1px solid var(--border-color);
+      padding: 3px;
+      border-radius: 4px;
+      z-index: 1000;
+    }
+    .btn-lang {
+      background: transparent;
+      color: #777;
+      border: none;
+      padding: 6px 10px;
+      font-family: sans-serif;
+      font-size: 0.75rem;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: all 0.15s ease;
+    }
+    .btn-lang.active {
+      background: var(--gold);
+      color: #111;
+    }
+
+    /* ===== Header ===== */
+    .menu-wrap { width: 100%; max-width: 520px; display: flex; flex-direction: column; align-items: center; padding: 40px 20px; }
+
+    h1 { font-family: 'Mantinia', serif; color: var(--gold); font-size: 3.2rem; letter-spacing: 8px; text-transform: uppercase; text-align: center;
+         text-shadow: 0 0 40px rgba(205,163,79,0.3), 0 2px 4px rgba(0,0,0,0.8); }
+    .author-tag { font-family: 'Mantinia', serif; color: #777; font-size: 0.85rem; letter-spacing: 3px; text-transform: uppercase; margin-top: 4px; }
+
+    /* ===== Spielprinzip ===== */
+    .game-desc { text-align: center; color: #b5a98f; font-size: 0.88rem; line-height: 1.65; margin: 28px 0 36px; max-width: 420px; font-family: sans-serif; }
+
+    /* ===== Buttons ===== */
+    .btn-main { display: block; width: 100%; max-width: 340px; padding: 16px; font-family: 'Mantinia', serif; font-weight: bold; font-size: 1.15rem; letter-spacing: 3px; cursor: pointer; border-radius: 4px; text-align: center; text-transform: uppercase; text-decoration: none; transition: all 0.2s ease; }
+    .btn-main + .btn-main { margin-top: 12px; }
+
+    .btn-normal { background: #2c2214; color: var(--gold); border: 1px solid var(--gold); }
+    .btn-normal:hover { background: var(--gold); color: #111; box-shadow: 0 0 24px rgba(205,163,79,0.5); transform: translateY(-2px); }
+
+    .btn-hard { background: #221111; color: #e74c3c; border: 1px solid #e74c3c; opacity: 0.45; cursor: not-allowed; font-size: 1rem; }
+    .btn-hard-active { background: #221111; color: #e74c3c; border: 1px solid #e74c3c; font-size: 1rem; text-decoration: none; }
+    .btn-hard-active:hover { background: #e74c3c; color: #111; box-shadow: 0 0 24px rgba(231,76,60,0.5); transform: translateY(-2px); }
+    .btn-continue { background: #14261a; color: #2ecc71; border: 1px solid #2ecc71; animation: continuePulse 2s ease infinite; }
+    .btn-continue:hover { background: #2ecc71; color: #111; box-shadow: 0 0 24px rgba(46,204,113,0.5); transform: translateY(-2px); animation: none; }
+    .btn-continue-hard { color: #e74c3c; border-color: #e74c3c; background: #261414; }
+    .btn-continue-hard:hover { background: #e74c3c; }
+    @keyframes continuePulse { 0%,100% { box-shadow: 0 0 8px rgba(46,204,113,0.3); } 50% { box-shadow: 0 0 18px rgba(46,204,113,0.6); } }
+    .challenge-card { background: #0f0f0f; border: 1px solid var(--border-color); border-radius: 6px; padding: 16px; display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+    .challenge-card .ch-icon { font-size: 2rem; width: 44px; text-align: center; flex-shrink: 0; }
+    .challenge-card .ch-name { font-family: 'Mantinia', serif; color: var(--gold); font-size: 1rem; letter-spacing: 1px; }
+    .challenge-card .ch-desc { font-size: 0.76rem; color: #b5a98f; font-family: sans-serif; margin-top: 2px; }
+    .challenge-card .ch-btns { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
+
+    .btn-row { display: flex; gap: 12px; margin-top: 22px; width: 100%; max-width: 340px; justify-content: center; }
+    .btn-secondary { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 10px; font-family: 'Mantinia', serif; font-size: 0.85rem; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; border-radius: 4px; transition: all 0.2s ease;
+      background: var(--panel); color: #b5a98f; border: 1px solid var(--border-color); }
+    .btn-secondary:hover { border-color: var(--gold); color: var(--gold); }
+    .btn-secondary .btn-icon { font-size: 1.1rem; }
+
+    /* ===== Account Bar ===== */
+    .account-section { margin-top: 28px; width: 100%; max-width: 340px; }
+    .account-bar { background: var(--panel); border: 1px solid var(--border-color); border-radius: 4px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .account-left { display: flex; align-items: center; gap: 10px; }
+    .account-left img { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--gold-dark); }
+    .account-name { font-size: 0.9rem; color: var(--gold); font-weight: bold; }
+    .account-sub { font-size: 0.68rem; color: #777; font-family: sans-serif; }
+    .btn-google { display: flex; align-items: center; gap: 8px; background: #fff; color: #444; border: none; border-radius: 4px; padding: 8px 14px; font-family: sans-serif; font-weight: bold; font-size: 0.85rem; cursor: pointer; }
+    .btn-google:hover { box-shadow: 0 0 14px rgba(255,255,255,0.25); }
+    .btn-google img { width: 16px; height: 16px; }
+    .btn-mini { background: #2c2214; color: var(--gold); border: 1px solid var(--gold-dark); border-radius: 4px; padding: 7px 12px; font-family: sans-serif; font-size: 0.8rem; cursor: pointer; }
+    .btn-mini:hover { background: var(--gold); color: #111; }
+    .name-input { background: #0e0e0e; border: 1px solid var(--border-color); color: #ede6d4; border-radius: 4px; padding: 7px 8px; font-family: sans-serif; font-size: 0.8rem; width: 120px; }
+
+    /* ===== Social ===== */
+    .social-row { display: flex; gap: 12px; margin-top: 28px; width: 100%; max-width: 340px; }
+    .btn-social { flex: 1; padding: 10px; font-family: 'Mantinia', serif; font-weight: bold; font-size: 0.8rem; cursor: pointer; border-radius: 4px; text-decoration: none; text-align: center; text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s ease; }
+    .btn-twitch { background: #6441a5; color: #fff; border: 1px solid #7d5bbe; }
+    .btn-twitch:hover { background: #7d5bbe; box-shadow: 0 0 15px rgba(100,65,165,0.6); }
+    .btn-discord { background: #5865F2; color: #fff; border: 1px solid #727efd; }
+    .btn-discord:hover { background: #727efd; box-shadow: 0 0 15px rgba(88,101,242,0.6); }
+
+    /* ===== Modal Overlay ===== */
+    .modal-bg { position: fixed; inset: 0; background: rgba(5,5,5,0.92); z-index: 500; display: none; justify-content: center; align-items: center; padding: 20px 16px; overflow-y: auto; backdrop-filter: blur(6px); }
+    .modal-bg.open { display: flex; }
+    .modal-box { background: var(--panel); border: 1px solid var(--gold); border-radius: 6px; padding: 28px; width: 100%; max-width: 700px; max-height: 85vh; overflow-y: auto; position: relative; box-shadow: 0 0 40px rgba(0,0,0,0.8); }
+    .modal-close { position: absolute; top: 12px; right: 16px; background: none; border: none; color: #888; font-size: 1.6rem; cursor: pointer; line-height: 1; }
+    .modal-close:hover { color: var(--gold); }
+    .modal-title { font-family: 'Mantinia', serif; color: var(--gold); font-size: 1.3rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 18px; text-align: center; }
+
+    /* ===== Bestenliste ===== */
+    .lb-table { width: 100%; border-collapse: collapse; font-family: sans-serif; }
+    .lb-table th { text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #888; padding: 8px 10px; border-bottom: 1px solid var(--border-color); }
+    .lb-table td { padding: 10px; border-bottom: 1px solid #1d1a13; font-size: 0.92rem; }
+    .lb-rank { font-family: 'Mantinia', serif; color: var(--gold); width: 42px; }
+    .lb-rank.gold { color: #ffd24a; } .lb-rank.silver { color: #cfd2d6; } .lb-rank.bronze { color: #cd7f32; }
+    .lb-name { display: flex; align-items: center; gap: 8px; }
+    .lb-name img { width: 24px; height: 24px; border-radius: 50%; }
+    .lb-score { text-align: right; color: var(--gold); font-weight: bold; }
+    .muted { color: #888; font-family: sans-serif; font-size: 0.85rem; text-align: center; padding: 16px; }
+    .hidden { display: none; }
+    .mode-tabs { display: flex; justify-content: center; gap: 6px; margin: -8px 0 14px; }
+    .mode-tab { background: transparent; color: #888; border: 1px solid var(--border-color); padding: 6px 18px; font-family: 'Mantinia', serif; font-size: 0.8rem; letter-spacing: 1px; cursor: pointer; border-radius: 4px; transition: all 0.15s ease; }
+    .mode-tab.active { background: var(--gold); color: #111; border-color: var(--gold); }
+    .mode-tab:last-child.active { background: #e74c3c; border-color: #e74c3c; color: #fff; }
+
+    /* ===== Achievements ===== */
+    .ach-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .ach-card { display: flex; gap: 12px; align-items: center; background: #0f0f0f; border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; }
+    .ach-card.locked { opacity: 0.45; filter: grayscale(0.7); }
+    .ach-card .ic { font-size: 2rem; width: 44px; text-align: center; flex-shrink: 0; }
+    .ach-card .nm { font-family: 'Mantinia', serif; color: var(--gold); font-size: 1rem; letter-spacing: 1px; }
+    .ach-card .ds { font-size: 0.76rem; color: #b5a98f; font-family: sans-serif; margin-top: 2px; }
+    .ach-progress { text-align: center; color: var(--gold); font-family: sans-serif; font-size: 0.85rem; margin-bottom: 16px; }
+    .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+    .stat-box { background: #0f0f0f; border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; text-align: center; }
+    .stat-box .v { font-family: 'Mantinia', serif; color: var(--gold); font-size: 1.5rem; }
+    .stat-box .l { font-size: 0.68rem; color: #888; font-family: sans-serif; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 3px; }
+
+    .btn-cam-spot { background: transparent; color: #666; border: 1px solid #333; padding: 8px 16px; font-family: sans-serif; font-size: 0.75rem; cursor: pointer; border-radius: 4px; transition: all 0.2s; }
+    .btn-cam-spot:hover { border-color: var(--gold); color: var(--gold); }
+    .cam-overlay { position: fixed; inset: 0; background: rgba(5,5,5,0.95); z-index: 600; display: none; justify-content: flex-end; align-items: flex-end; padding: 30px; }
+    .cam-overlay.open { display: flex; }
+    .cam-box { text-align: center; color: #888; font-family: sans-serif; font-size: 0.85rem; }
+    .cam-spot { width: 320px; height: 240px; border: 2px dashed var(--gold); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--gold); font-family: 'Mantinia', serif; font-size: 1.1rem; letter-spacing: 2px; position: relative; }
+    .cam-close { position: absolute; top: 20px; left: 20px; }
+    .cam-hint { font-size: 0.72rem; color: #888; font-family: sans-serif; margin-top: 8px; text-align: center; }
+
+    @media (max-width: 540px) {
+      h1 { font-size: 2.4rem; letter-spacing: 5px; margin-top: 32px; }
+      .ach-grid { grid-template-columns: 1fr; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="global-lang-switcher">
+  <button class="btn-lang" id="btn-lang-de" onclick="window.i18n.setLang('de')">DE</button>
+  <button class="btn-lang" id="btn-lang-en" onclick="window.i18n.setLang('en')">EN</button>
+</div>
+
+<div class="menu-wrap">
+  <h1>Elden Rogue</h1>
+  <div class="author-tag" id="main-author-tag">by Hoschi</div>
+
+  <div class="game-desc" id="desc-text">
+    Ein Elden-Ring-Roguelike: Wähle deinen Pfad über eine verzweigte Karte, 
+    besiege Feinde und Bosse, sammle Waffen, Rüstungen und Talismane – 
+    und kämpfe dich durch die Zwischenlande bis zum Eldenthron. 
+    Jeder Run ist zufällig, jeder Tod endgültig.
+  </div>
+
+  <a href="game.html" class="btn-main btn-normal" id="btn-normal" onclick="return checkOverwrite('game.html')">Normaler Modus</a>
+  <a href="game.html?mode=hard" class="btn-main btn-hard-active" id="btn-hard" onclick="return checkOverwrite('game.html?mode=hard')">Hard Mode</a>
+
+  <a href="game.html?resume=true" class="btn-main btn-continue" id="btn-continue" style="display:none;">▶ Run fortsetzen</a>
+
+  <div class="btn-row">
+    <button class="btn-secondary" onclick="openModal('bestenliste')">
+      <span class="btn-icon">🏆</span> <span id="btn-lb-text">Bestenliste</span>
+    </button>
+    <button class="btn-secondary" onclick="openModal('achievements')">
+      <span class="btn-icon">⭐</span> <span id="btn-ach-text">Achievements</span>
+    </button>
+    <button class="btn-secondary" onclick="openModal('challenges')">
+      <span class="btn-icon">🏴</span> <span id="btn-ch-text">Challenges</span>
+    </button>
+  </div>
+
+  <div class="account-section">
+    <div class="account-bar" id="account-bar">
+      <div class="account-left" id="account-left"><div><div class="account-name">Lade…</div></div></div>
+      <div id="account-right"></div>
+    </div>
+  </div>
+
+  <div class="social-row">
+    <a href="https://www.twitch.tv/officialhoschi" target="_blank" class="btn-social btn-twitch">🎥 Twitch</a>
+    <a href="https://discord.gg/mUSzTDw8Ns" target="_blank" class="btn-social btn-discord">💬 Discord</a>
+  </div>
+
+  <div style="margin-top:16px; text-align:center;">
+    <button class="btn-cam-spot" id="btn-cam" onclick="document.getElementById('cam-overlay').classList.toggle('open')">🎥 Streamer Cam-Spot</button>
+  </div>
+
+<div class="cam-overlay" id="cam-overlay" onclick="this.classList.remove('open')">
+  <div class="cam-close"><button class="btn-mini" onclick="document.getElementById('cam-overlay').classList.remove('open')">✕ Schließen</button></div>
+  <div class="cam-box" onclick="event.stopPropagation()">
+    <div class="cam-spot">📷 CAM</div>
+    <div class="cam-hint">↑ Kamera hier platzieren (unten rechts)</div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-challenges">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModals()">&times;</button>
+    <div class="modal-title" id="ch-title">Challenge Runs</div>
+    <div class="challenge-card">
+      <div class="ch-icon">🛡️</div>
+      <div>
+        <div class="ch-name" id="ch-noarmor-name">No Armor</div>
+        <div class="ch-desc" id="ch-noarmor-desc">Du kannst keine Rüstung anlegen.</div>
+      </div>
+      <div class="ch-btns">
+        <a href="#" onclick="return checkOverwrite('game.html?challenge=noarmor')" class="btn-mini" id="ch-noarmor-btn-n">Normal</a>
+        <a href="#" onclick="return checkOverwrite('game.html?challenge=noarmor&amp;mode=hard')" class="btn-mini" style="border-color:#e74c3c; color:#e74c3c;" id="ch-noarmor-btn-h">Hard</a>
+      </div>
+    </div>
+    <div class="challenge-card">
+      <div class="ch-icon">🐺</div>
+      <div>
+        <div class="ch-name" id="ch-noblaidd-name">No Blaidd</div>
+        <div class="ch-desc" id="ch-noblaidd-desc">Keine Blaidd-Quest. Keine Begegnungen.</div>
+      </div>
+      <div class="ch-btns">
+        <a href="#" onclick="return checkOverwrite('game.html?challenge=noblaidd')" class="btn-mini">Normal</a>
+        <a href="#" onclick="return checkOverwrite('game.html?challenge=noblaidd&amp;mode=hard')" class="btn-mini" style="border-color:#e74c3c; color:#e74c3c;">Hard</a>
+      </div>
+    </div>
+    <div class="challenge-card">
+      <div class="ch-icon">⚡</div>
+      <div>
+        <div class="ch-name" id="ch-auto-name">Auto-Battle</div>
+        <div class="ch-desc" id="ch-auto-desc">Automatischer Angriff, keine Heilung.</div>
+      </div>
+      <div class="ch-btns">
+        <a href="#" onclick="return checkOverwrite('game.html?challenge=autobattle')" class="btn-mini">Normal</a>
+        <a href="#" onclick="return checkOverwrite('game.html?challenge=autobattle&amp;mode=hard')" class="btn-mini" style="border-color:#e74c3c; color:#e74c3c;">Hard</a>
+      </div>
+    </div>
+    <div style="color:#666; font-size:0.75rem; font-family:sans-serif; text-align:center; margin-top:14px;" id="ch-footer">Weitere Challenges kommen bald…</div>
+  </div>
+</div>
+
+</div>
+
+<div class="modal-bg" id="modal-bestenliste">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModals()">&times;</button>
+    <div class="modal-title" id="lb-title">Bestenliste</div>
+    <div class="mode-tabs" id="lb-mode-tabs">
+      <button class="mode-tab active" id="lb-tab-normal" onclick="switchLbMode('normal')">Normal</button>
+      <button class="mode-tab" id="lb-tab-hard" onclick="switchLbMode('hard')">Hard</button>
+    </div>
+    <div id="lb-version" style="text-align:center; color:#8c6d2d; font-family:'Mantinia',serif; font-size:0.72rem; letter-spacing:2px; margin:-4px 0 12px;">PATCH v1.3</div>
+    <div id="lb-status" class="muted">Lade Bestenliste…</div>
+    <table class="lb-table hidden" id="lb-table">
+      <thead><tr><th>#</th><th id="th-player">Befleckter</th><th id="th-stage">Etappe</th><th id="th-bosses">Bosse</th><th style="text-align:right;" id="th-score">Score</th></tr></thead>
+      <tbody id="lb-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-achievements">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModals()">&times;</button>
+    <div class="modal-title" id="ach-title">Achievements</div>
+    <div class="mode-tabs" id="ach-mode-tabs">
+      <button class="mode-tab active" id="ach-tab-normal" onclick="switchAchMode('normal')">Normal</button>
+      <button class="mode-tab" id="ach-tab-hard" onclick="switchAchMode('hard')">Hard</button>
+    </div>
+    <div class="stat-grid" id="stat-grid"></div>
+    <div class="ach-progress" id="ach-progress"></div>
+    <div class="ach-grid" id="ach-grid"></div>
+  </div>
+</div>
+
+<script>
+  /* ===== UI Translation Logic ===== */
+  function renderStaticText() {
+    if (!window.i18n) return;
+    let t = window.i18n.t;
+    let lang = window.i18n.getLang();
+    
+    document.getElementById("main-author-tag").innerText = t("author_tag");
+    document.getElementById("btn-normal").innerText = t("mode_normal");
+    document.getElementById("btn-lb-text").innerText = t("tab_leaderboard");
+    document.getElementById("btn-ach-text").innerText = t("tab_achievements");
+    document.getElementById("lb-title").innerText = t("tab_leaderboard");
+    document.getElementById("ach-title").innerText = t("tab_achievements");
+    document.getElementById("th-player").innerText = t("lb_th_player");
+    document.getElementById("th-stage").innerText = t("lb_th_stage");
+    document.getElementById("th-bosses").innerText = t("lb_th_bosses");
+    document.getElementById("th-score").innerText = t("lb_th_score");
+
+    // Hardcoded Fallbacks für die neuen Texte im neuen Layout
+    document.getElementById("desc-text").innerText = lang === 'en' 
+      ? "An Elden Ring Roguelike: Choose your path across a branching map, defeat enemies and bosses, collect weapons, armor, and talismans – and fight your way through the Lands Between to the Elden Throne. Every run is random, every death is final." 
+      : "Ein Elden-Ring-Roguelike: Wähle deinen Pfad über eine verzweigte Karte, besiege Feinde und Bosse, sammle Waffen, Rüstungen und Talismane – und kämpfe dich durch die Zwischenlande bis zum Eldenthron. Jeder Run ist zufällig, jeder Tod endgültig.";
+    
+    document.getElementById("btn-hard").innerText = lang === 'en' ? "Hard Mode" : "Schwerer Modus";
+    // Mode tab labels
+    document.getElementById("lb-tab-normal").innerText = t("lb_mode_normal");
+    document.getElementById("lb-tab-hard").innerText = t("lb_mode_hard");
+    document.getElementById("ach-tab-normal").innerText = t("lb_mode_normal");
+    document.getElementById("ach-tab-hard").innerText = t("lb_mode_hard");
+    // Challenge labels
+    document.getElementById("ch-title").innerText = t("challenge_title");
+    document.getElementById("ch-noarmor-name").innerText = t("challenge_noarmor");
+    document.getElementById("ch-noarmor-desc").innerText = t("challenge_noarmor_desc");
+    document.getElementById("ch-noarmor-btn-n").innerText = t("lb_mode_normal");
+    document.getElementById("ch-noarmor-btn-h").innerText = t("lb_mode_hard");
+    document.getElementById("ch-footer").innerText = lang === 'en' ? "More challenges coming soon…" : "Weitere Challenges kommen bald…";
+    document.getElementById("btn-ch-text").innerText = t("challenge_title");
+    // Continue button
+    checkContinueButtons(t);
+  }
+
+  function checkContinueButtons(t) {
+    if (!t) t = window.i18n ? window.i18n.t : (k) => k;
+    let save = null;
+    try { let d = localStorage.getItem("eldenRogueSave"); save = d ? JSON.parse(d) : null; } catch(e){}
+    let btn = document.getElementById("btn-continue");
+    if (save && save.gewaehlteKlasse) {
+      btn.style.display = "block";
+      let label = "▶ " + t("btn_continue");
+      if (save.hardMode) label += " (Hard)";
+      if (save.challenge) label += " [" + save.challenge.toUpperCase() + "]";
+      btn.innerText = label;
+      // Resume-Link muss mode + challenge enthalten
+      let url = "game.html?resume=true";
+      if (save.hardMode) url += "&mode=hard";
+      if (save.challenge) url += "&challenge=" + save.challenge;
+      btn.href = url;
+    } else {
+      btn.style.display = "none";
+    }
+  }
+
+  function updateLangSwitcherButtons() {
+    if (!window.i18n) return;
+    let currentLang = window.i18n.getLang();
+    let btnDe = document.getElementById("btn-lang-de");
+    let btnEn = document.getElementById("btn-lang-en");
+    if (btnDe && btnEn) {
+      btnDe.classList.toggle("active", currentLang === "de");
+      btnEn.classList.toggle("active", currentLang === "en");
+    }
+  }
+
+  document.addEventListener("languageChanged", function() {
+    renderStaticText();
+    updateLangSwitcherButtons();
+    if (window.ER) { renderAccount(ER.currentUser()); }
+    if (document.getElementById("modal-bestenliste").classList.contains("open")) ladeBestenliste();
+    if (document.getElementById("modal-achievements").classList.contains("open")) ladeAchievements();
+  });
+
+  /* ===== Modal Handling ===== */
+  let lbMode = "normal", achMode = "normal";
+
+  function switchLbMode(m) {
+    lbMode = m;
+    document.getElementById("lb-tab-normal").classList.toggle("active", m === "normal");
+    document.getElementById("lb-tab-hard").classList.toggle("active", m === "hard");
+    ladeBestenliste();
+  }
+  function switchAchMode(m) {
+    achMode = m;
+    document.getElementById("ach-tab-normal").classList.toggle("active", m === "normal");
+    document.getElementById("ach-tab-hard").classList.toggle("active", m === "hard");
+    ladeAchievements();
+  }
+
+  function openModal(name) {
+    closeModals();
+    var m = document.getElementById("modal-" + name);
+    if (m) m.classList.add("open");
+    if (name === "bestenliste") ladeBestenliste();
+    if (name === "achievements") ladeAchievements();
+  }
+  function closeModals() {
+    document.querySelectorAll(".modal-bg").forEach(function(m) { m.classList.remove("open"); });
+  }
+  document.querySelectorAll(".modal-bg").forEach(function(bg) {
+    bg.addEventListener("click", function(e) { if (e.target === bg) closeModals(); });
+  });
+  document.addEventListener("keydown", function(e) { if (e.key === "Escape") closeModals(); });
+
+  /* ===== Account ===== */
+  function renderAccount(user) {
+    var left = document.getElementById("account-left");
+    var right = document.getElementById("account-right");
+    var online = window.ER && ER.isOnline();
+    let t = window.i18n ? window.i18n.t : (k) => k; // Safe fallback
+
+    if (user) {
+      var curName = (window.ER ? ER.getPlayerName() : (user.displayName || t("lb_th_player")));
+      left.innerHTML = (user.photoURL ? '<img src="' + user.photoURL + '" alt="">' : "") +
+        '<div><div class="account-name">' + curName + '</div><div class="account-sub">' + t("registered_sub") + '</div></div>';
+      right.innerHTML = '<input class="name-input" id="nick-input" value="' + curName.replace(/"/g, "&quot;") + '" maxlength="18" title="' + t("lbl_name") + '"> ' +
+        '<button class="btn-mini" id="nick-save">' + t("btn_save") + '</button> ' +
+        '<button class="btn-mini" id="btn-logout">' + t("btn_logout") + '</button>';
+      document.getElementById("nick-save").onclick = function () {
+        var v = document.getElementById("nick-input").value.trim();
+        if (!v) return;
+        ER.setPlayerName(v); renderAccount(user);
+        if (document.getElementById("modal-bestenliste").classList.contains("open")) ladeBestenliste();
+      };
+      document.getElementById("btn-logout").onclick = function () { ER.signOut(); };
+    } else if (online) {
+      left.innerHTML = '<div><div class="account-name">' + (window.i18n ? t("unregistered") : "Nicht angemeldet") + '</div><div class="account-sub">' + (window.i18n ? t("unregistered_sub") : "Melde dich an, um deinen Fortschritt online zu speichern") + '</div></div>';
+      right.innerHTML = '<button class="btn-google" id="btn-google"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="">' + (window.i18n ? t("btn_login") : "Mit Google anmelden") + '</button>';
+      document.getElementById("btn-google").onclick = function () { ER.signInWithGoogle().catch(function(){}); };
+    } else {
+      var name = (window.ER ? ER.getPlayerName() : (window.i18n ? t("lb_th_player") : "Befleckter"));
+      left.innerHTML = '<div><div class="account-name">' + (window.i18n ? t("local_mode") : "Lokaler Modus") + '</div><div class="account-sub">' + (window.i18n ? t("local_mode_sub") : "Fortschritt wird im Browser gespeichert") + '</div></div>';
+      right.innerHTML = '<span style="font-size:0.68rem;color:#888;font-family:sans-serif;">' + (window.i18n ? t("lbl_name") : "Name:") + '</span> <input class="name-input" id="name-input" value="' + name.replace(/"/g, "&quot;") + '" maxlength="18"> <button class="btn-mini" id="name-save">' + (window.i18n ? t("btn_save") : "OK") + '</button>';
+      document.getElementById("name-save").onclick = function () {
+        var v = document.getElementById("name-input").value.trim() || (window.i18n ? t("lb_th_player") : "Befleckter");
+        ER.setPlayerName(v); alert((window.i18n ? t("saved_alert") : "Name gespeichert: ") + v);
+      };
+    }
+  }
+
+  /* ===== Bestenliste ===== */
+  function ladeBestenliste() {
+    var status = document.getElementById("lb-status");
+    var table = document.getElementById("lb-table");
+    var body = document.getElementById("lb-body");
+    let t = window.i18n ? window.i18n.t : (k) => k;
+
+    if (!window.ER) { status.textContent = "Nicht verfügbar."; return; }
+    status.classList.remove("hidden"); table.classList.add("hidden");
+    status.textContent = window.i18n ? t("lb_loading") : "Lade Bestenliste…";
+
+    ER.getLeaderboard(20, function (rows, online) {
+      if (!rows || rows.length === 0) {
+        status.textContent = online 
+          ? (window.i18n ? t("lb_no_entries_online") : "Noch keine Einträge – sei der Erste!") 
+          : (window.i18n ? t("lb_no_entries_local") : "Noch keine lokalen Läufe. Spiel eine Runde!");
+        return;
+      }
+      body.innerHTML = "";
+      rows.forEach(function (r, i) {
+        var rankClass = i === 0 ? "gold" : (i === 1 ? "silver" : (i === 2 ? "bronze" : ""));
+        var tr = document.createElement("tr");
+        tr.innerHTML =
+          '<td class="lb-rank ' + rankClass + '">' + (i + 1) + '</td>' +
+          '<td><span class="lb-name">' + (r.photo ? '<img src="' + r.photo + '">' : "") + (r.name || (window.i18n ? t("lb_th_player") : "Befleckter")) + '</span></td>' +
+          '<td>' + (r.stage || 0) + '</td>' +
+          '<td>' + (r.bosses || 0) + '</td>' +
+          '<td class="lb-score">' + (r.score || 0) + '</td>';
+        body.appendChild(tr);
+      });
+      status.classList.add("hidden"); table.classList.remove("hidden");
+    }, lbMode);
+  }
+
+  /* ===== Achievements ===== */
+  function ladeAchievements() {
+    if (!window.ER) return;
+    ER.setMode(achMode);
+    var s = ER.getStats();
+    var statGrid = document.getElementById("stat-grid");
+    
+    // Translated Stats mapping
+    let isDe = !window.i18n || window.i18n.getLang() === 'de';
+
+    statGrid.innerHTML = `
+      <div class="stat-box"><div class="v">${s.fightsWon || 0}</div><div class="l">${isDe ? 'Kämpfe gewonnen' : 'Battles Won'}</div></div>
+      <div class="stat-box"><div class="v">${s.bossesKilled || 0}</div><div class="l">${isDe ? 'Bosse besiegt' : 'Bosses Slain'}</div></div>
+      <div class="stat-box"><div class="v">${s.deaths || 0}</div><div class="l">${isDe ? 'Tode' : 'Deaths'}</div></div>
+      <div class="stat-box"><div class="v">${s.runsStarted || 0}</div><div class="l">${isDe ? 'Runs gestartet' : 'Runs Started'}</div></div>
+      <div class="stat-box"><div class="v">${s.dungeonsCleared || 0}</div><div class="l">Dungeons</div></div>
+      <div class="stat-box"><div class="v">${s.bestScore || 0}</div><div class="l">${isDe ? 'Bester Score' : 'Best Score'}</div></div>`;
+
+    var list = ER.getAchievements();
+    var done = list.filter(function (a) { return a.unlocked; }).length;
+    document.getElementById("ach-progress").textContent = (isDe ? "Freigeschaltet: " : "Unlocked: ") + done + " / " + list.length;
+    document.getElementById("ach-grid").innerHTML = list.map(function (a) {
+      return '<div class="ach-card ' + (a.unlocked ? "" : "locked") + '">' +
+        '<div class="ic">' + (a.unlocked ? a.icon : "🔒") + '</div>' +
+        '<div><div class="nm">' + a.name + '</div><div class="ds">' + a.desc + '</div></div></div>';
+    }).join("");
+  }
+
+  /* ===== Init ===== */
+  if (window.ER) { ER.onUserChange(renderAccount); }
+  else { document.getElementById("account-left").innerHTML = '<div><div class="account-name">Lokaler Modus</div><div class="account-sub">Fortschritt wird im Browser gespeichert</div></div>'; }
+
+  function checkOverwrite(url) {
+    var save = null;
+    try { var d = localStorage.getItem("eldenRogueSave"); save = d ? JSON.parse(d) : null; } catch(e){}
+    if (save && save.gewaehlteKlasse) {
+      var t = window.i18n ? window.i18n.t : function(k){return k;};
+      var msg = (window.i18n && window.i18n.lang === 'en')
+        ? "You have a saved run. Starting a new game will overwrite it. Continue?"
+        : "Du hast einen gespeicherten Run. Ein neues Spiel überschreibt ihn. Fortfahren?";
+      if (!confirm(msg)) return false;
+      try { localStorage.removeItem("eldenRogueSave"); } catch(e){}
+    }
+    window.location.href = url;
+    return false;
+  }
+  
+  // Call initialization logic for translations once
+  renderStaticText();
+  updateLangSwitcherButtons();
+</script>
+</body>
+</html>
