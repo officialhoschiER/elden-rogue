@@ -153,6 +153,8 @@
 
     .btn-cam-spot { background: transparent; color: #666; border: 1px solid #333; padding: 8px 16px; font-family: sans-serif; font-size: 0.75rem; cursor: pointer; border-radius: 4px; transition: all 0.2s; }
     .btn-cam-spot:hover { border-color: var(--gold); color: var(--gold); }
+    .modal-center-overlay { position: fixed; inset: 0; background: rgba(5,5,5,0.92); z-index: 600; display: none; justify-content: center; align-items: center; }
+    .modal-center-overlay.open { display: flex; }
     .email-box { background: var(--panel); border: 1px solid var(--gold); border-radius: 8px; padding: 28px 32px; width: 340px; text-align: center; }
     .cam-overlay { position: fixed; inset: 0; background: rgba(5,5,5,0.95); z-index: 600; display: none; justify-content: flex-end; align-items: flex-end; padding: 30px; }
     .cam-overlay.open { display: flex; }
@@ -219,7 +221,7 @@
     <button class="btn-cam-spot" id="btn-cam" onclick="document.getElementById('cam-overlay').classList.toggle('open')">🎥 Streamer Cam-Spot</button>
   </div>
 
-<div class="cam-overlay" id="email-login-modal">
+<div class="modal-center-overlay" id="email-login-modal">
   <div class="email-box" onclick="event.stopPropagation()">
     <div style="color:var(--gold); font-family:'Mantinia',serif; font-size:1.3rem; letter-spacing:3px; margin-bottom:16px;">✉ E-MAIL LOGIN</div>
     <div id="email-error" style="color:#e74c3c; font-size:0.8rem; font-family:sans-serif; margin-bottom:8px; display:none;"></div>
@@ -304,7 +306,7 @@
       <button class="mode-tab active" id="lb-tab-normal" onclick="switchLbMode('normal')">Normal</button>
       <button class="mode-tab" id="lb-tab-hard" onclick="switchLbMode('hard')">Hard</button>
     </div>
-    <div id="lb-version" style="text-align:center; color:#8c6d2d; font-family:'Mantinia',serif; font-size:0.72rem; letter-spacing:2px; margin:-4px 0 12px;">PATCH v1.3</div>
+    <div style="text-align:center; margin:-4px 0 12px;"><select id="lb-patch" style="background:#111; color:var(--gold); border:1px solid var(--gold-dark); padding:4px 12px; font-family:'Mantinia',serif; font-size:0.75rem; letter-spacing:1px; border-radius:3px; cursor:pointer;"><option value="1.3" selected>PATCH v1.3</option></select></div>
     <div id="lb-status" class="muted">Lade Bestenliste…</div>
     <table class="lb-table hidden" id="lb-table">
       <thead><tr><th>#</th><th id="th-player">Befleckter</th><th id="th-stage">Etappe</th><th id="th-bosses">Bosse</th><th style="text-align:right;" id="th-score">Score</th></tr></thead>
@@ -317,10 +319,7 @@
   <div class="modal-box">
     <button class="modal-close" onclick="closeModals()">&times;</button>
     <div class="modal-title" id="ach-title">Achievements</div>
-    <div class="mode-tabs" id="ach-mode-tabs">
-      <button class="mode-tab active" id="ach-tab-normal" onclick="switchAchMode('normal')">Normal</button>
-      <button class="mode-tab" id="ach-tab-hard" onclick="switchAchMode('hard')">Hard</button>
-    </div>
+
     <div class="stat-grid" id="stat-grid"></div>
     <div class="ach-progress" id="ach-progress"></div>
     <div class="ach-grid" id="ach-grid"></div>
@@ -354,8 +353,7 @@
     // Mode tab labels
     document.getElementById("lb-tab-normal").innerText = t("lb_mode_normal");
     document.getElementById("lb-tab-hard").innerText = t("lb_mode_hard");
-    document.getElementById("ach-tab-normal").innerText = t("lb_mode_normal");
-    document.getElementById("ach-tab-hard").innerText = t("lb_mode_hard");
+
     // Challenge labels
     document.getElementById("ch-title").innerText = t("challenge_title");
     document.getElementById("ch-noarmor-name").innerText = t("challenge_noarmor");
@@ -517,7 +515,7 @@
       return; 
     }
     try {
-    if (ER.setMode) ER.setMode(achMode);
+    // Stats always from default mode
     var s = ER.getStats();
     var statGrid = document.getElementById("stat-grid");
     
