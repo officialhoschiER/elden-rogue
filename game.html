@@ -1645,7 +1645,8 @@ function spielerAngriff() {
   }
 
   let schaden = finalDmg + Math.floor(Math.random() * 5) - 2;
-  schaden = 9999; // ⚠️ TEST-OVERRIDE: Entfernen für Release! gegnerHp = Math.max(0, gegnerHp - schaden);
+  schaden = 9999; // ⚠️ TEST-OVERRIDE: Diese eine Zeile vor dem Release entfernen!
+  gegnerHp = Math.max(0, gegnerHp - schaden);
 
   if (gegnerHp > 0) {
     playerHitsOnEnemy++;
