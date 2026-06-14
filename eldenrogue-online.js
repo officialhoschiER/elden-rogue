@@ -37,6 +37,8 @@
   }
 
   /* ====== 2) SPEICHER-HELFER (robust, fällt nie auf die Nase) ====== */
+  let currentMode = "normal";
+  function mKey(base) { return currentMode === "hard" ? base + "_hard" : base; }
   const STATS_KEY = "eldenRogueStats";
   const RUN_KEY   = "eldenRogueRun";
   const ACH_KEY   = "eldenRogueAchievements";
@@ -50,15 +52,15 @@
     fightsWon: 0, bossesKilled: 0, elitesKilled: 0, minibossesKilled: 0, invadersKilled: 0,
     runsStarted: 0, deaths: 0, dungeonsCleared: 0, talismansFound: 0, weaponsFound: 0,
     armorsFound: 0, blaiddDefeats: 0, gamesCompleted: 0, furthestStage: 0,
-    bestRunBosses: 0, bestScore: 0, flasksDrunk: 0, bossKills: {}
+    bestRunBosses: 0, bestScore: 0, flasksDrunk: 0, hardCompleted: 0, challengesDone: [], bossKills: {}
   };
 
-  function getStats() { return Object.assign({}, DEFAULT_STATS, lsGet(STATS_KEY, {})); }
-  function saveStats(s) { lsSet(STATS_KEY, s); }
-  function getRun() { return lsGet(RUN_KEY, { stage: 0, bosses: 0, fights: 0 }); }
-  function saveRun(r) { lsSet(RUN_KEY, r); }
-  function getUnlocked() { return lsGet(ACH_KEY, []); }
-  function saveUnlocked(a) { lsSet(ACH_KEY, a); }
+  function getStats() { return Object.assign({}, DEFAULT_STATS, lsGet(mKey(STATS_KEY), {})); }
+  function saveStats(s) { lsSet(mKey(STATS_KEY), s); }
+  function getRun() { return lsGet(mKey(RUN_KEY), { stage: 0, bosses: 0, fights: 0 }); }
+  function saveRun(r) { lsSet(mKey(RUN_KEY), r); }
+  function getUnlocked() { return lsGet(mKey(ACH_KEY), []); }
+  function saveUnlocked(a) { lsSet(mKey(ACH_KEY), a); }
 
   /* ====== 3) ACHIEVEMENTS ====== */
   const ACHIEVEMENTS = [
@@ -83,6 +85,20 @@
     { id: "talisman_25",name: "Talisman-Sammler",       icon: "💍", desc: "Finde 25 Talismane.",                    check: s => s.talismansFound >= 25 },
     { id: "weapon_25",  name: "Waffennarr",             icon: "🗡️", desc: "Finde 25 Waffen.",                      check: s => s.weaponsFound >= 25 },
     { id: "armor_10",   name: "Gut gerüstet",           icon: "🛡️", desc: "Finde 10 Rüstungen.",                   check: s => s.armorsFound >= 10 },
+    { id: "hard_lord",    name: "Wahrer Elden Lord",  icon: "🔥", desc: "Schließe Hard-Mode ab.",           check: s => (s.hardCompleted || 0) >= 1 },
+    { id: "challenge_noarmor", name: "Nacktläufer", icon: "🛡️", desc: "No-Armor-Run abgeschlossen.",  check: s => (s.challengesDone || []).indexOf("noarmor") !== -1 },
+    { id: "challenge_noblaidd", name: "Einsamer Wolf", icon: "🐺", desc: "No-Blaidd-Run abgeschlossen.", check: s => (s.challengesDone || []).indexOf("noblaidd") !== -1 },
+    { id: "challenge_auto", name: "Zuschauer", icon: "⚡", desc: "Auto-Battle-Run abgeschlossen.",    check: s => (s.challengesDone || []).indexOf("autobattle") !== -1 },
+    { id: "challenge_haligtree", name: "Lord of the Haligtree", icon: "🌳", desc: "Malenia im Haligtree besiegt.", check: s => (s.challengesDone || []).indexOf("haligtree") !== -1 },
+    { id: "complete_10",  name: "Veteran",         icon: "🏅", desc: "Schließe 10 Runs ab.",         check: s => s.gamesCompleted >= 10 },
+    { id: "complete_25",  name: "Legende",          icon: "🏆", desc: "Schließe 25 Runs ab.",         check: s => s.gamesCompleted >= 25 },
+    { id: "hard_5",       name: "Masochist",        icon: "💀", desc: "Schließe Hard-Mode 5x ab.",    check: s => (s.hardCompleted || 0) >= 5 },
+    { id: "malenia",      name: "Scarlet Bloom",    icon: "🦋", desc: "Besiege Malenia.",             check: s => (s.bossKills["Malenia, Goddess of Rot"] || 0) >= 1 },
+    { id: "loretta",      name: "Ritterin gefallen", icon: "🏰", desc: "Besiege Loretta.",            check: s => (s.bossKills["Loretta, Knight of the Haligtree"] || 0) >= 1 },
+    { id: "niall",        name: "Kommandant besiegt", icon: "⚔️", desc: "Besiege Commander Niall.",   check: s => (s.bossKills["Commander Niall"] || 0) >= 1 },
+    { id: "death_100",    name: "Unsterblich",       icon: "💀", desc: "Stirb 100 Mal.",              check: s => s.deaths >= 100 },
+    { id: "win_2500",     name: "Kriegsgott",        icon: "⚔️", desc: "Gewinne 2500 Kämpfe.",       check: s => s.fightsWon >= 2500 },
+    { id: "all_bosses",   name: "Götterdämmerung",  icon: "✨", desc: "Besiege jeden Halbgott mindestens einmal.", check: s => { let b = s.bossKills || {}; return ["Godrick, der Verpflanzte","Sternengeißel Radahn","Morgott, der Omenkönig","Feuerriese","Maliketh, die Schwarze Klinge"].every(n => (b[n]||0) >= 1); } },
     { id: "flask_500",  name: "Estus-süchtig",          icon: "🧪", desc: "Trinke 500 Flakons.",                    check: s => s.flasksDrunk >= 500 }
   ];
 
@@ -125,7 +141,7 @@
     isOnline: function () { return ONLINE; },
 
     /* --- Run-Lebenszyklus --- */
-    startRun: function () { saveRun({ stage: 1, bosses: 0, fights: 0 }); bump("runsStarted"); setMax("furthestStage", 1); },
+    startRun: function (mode) { if (mode) currentMode = mode; saveRun({ stage: 1, bosses: 0, fights: 0 }); bump("runsStarted"); setMax("furthestStage", 1); },
     endRun: function () {
       var r = getRun();
       var score = (r.stage || 0) * 1000 + (r.bosses || 0) * 200 + (r.fights || 0) * 10;
@@ -150,6 +166,8 @@
     blaiddDefeat: function () { bump("blaiddDefeats"); },
     gameCompleted: function () { bump("gamesCompleted"); ER.endRun(); },
     flaskDrunk:   function () { bump("flasksDrunk"); },
+    hardCompleted: function () { var s = getStats(); s.hardCompleted = (s.hardCompleted || 0) + 1; saveStats(s); checkAchievements(); },
+    challengeCompleted: function (name) { var s = getStats(); s.challengesDone = s.challengesDone || []; if (s.challengesDone.indexOf(name) === -1) s.challengesDone.push(name); saveStats(s); checkAchievements(); },
     reachStage:   function (n) { if (n) { setMax("furthestStage", n); var r = getRun(); if (n > (r.stage || 0)) { r.stage = n; saveRun(r); } } },
 
     /* --- Abfragen --- */
@@ -166,13 +184,27 @@
       var provider = new firebase.auth.GoogleAuthProvider();
       return fbAuth.signInWithPopup(provider);
     },
+    signInWithEmail: function (email, pass) {
+      if (!ONLINE) { alert("Online-Login ist noch nicht konfiguriert."); return Promise.reject("offline"); }
+      return fbAuth.signInWithEmailAndPassword(email, pass);
+    },
+    signUpWithEmail: function (email, pass, name) {
+      if (!ONLINE) { alert("Online-Login ist noch nicht konfiguriert."); return Promise.reject("offline"); }
+      return fbAuth.createUserWithEmailAndPassword(email, pass).then(function(cred) {
+        if (name && cred.user) { return cred.user.updateProfile({ displayName: name }).then(function() { ER.setPlayerName(name); return cred; }); }
+        return cred;
+      });
+    },
     signOut: function () { if (fbAuth) return fbAuth.signOut(); return Promise.resolve(); },
 
     /* --- Bestenliste --- */
-    getLeaderboard: function (limit, cb) {
+    getMode: function() { return currentMode; },
+    setMode: function(m) { currentMode = m || "normal"; },
+    getLeaderboard: function (limit, cb, mode) {
+      var prev = currentMode; if (mode) currentMode = mode;
       limit = limit || 20;
       if (ONLINE && fbDB) {
-        fbDB.collection("users").orderBy("bestScore", "desc").limit(limit).get()
+        fbDB.collection(currentMode === "hard" ? "users_hard" : "users").orderBy("bestScore", "desc").limit(limit).get()
           .then(function (snap) {
             var rows = [];
             snap.forEach(function (d) { var x = d.data(); rows.push({ name: x.displayName || "Befleckter", score: x.bestScore || 0, stage: x.furthestStage || 0, bosses: x.bestRunBosses || 0, photo: x.photoURL || "" }); });
@@ -182,12 +214,13 @@
       } else {
         cb(localBoard(limit), false);
       }
+      currentMode = prev;
     }
   };
 
   /* ====== 6) LOKALE BESTENLISTE ====== */
   function localBoard(limit) {
-    var b = lsGet(BOARD_KEY, []);
+    var b = lsGet(mKey(BOARD_KEY), []);
     b.sort(function (a, c) { return c.score - a.score; });
     return b.slice(0, limit);
   }
@@ -195,11 +228,11 @@
     if (score <= 0) return;
     var name = ER.getPlayerName();
     // lokal
-    var b = lsGet(BOARD_KEY, []);
+    var b = lsGet(mKey(BOARD_KEY), []);
     var mine = b.find(function (x) { return x.name === name && x.local; });
     if (mine) { if (score > mine.score) { mine.score = score; mine.stage = meta.stage; mine.bosses = meta.bosses; } }
     else { b.push({ name: name, score: score, stage: meta.stage, bosses: meta.bosses, local: true }); }
-    lsSet(BOARD_KEY, b);
+    lsSet(mKey(BOARD_KEY), b);
     // cloud
     cloudPush();
   }
@@ -209,7 +242,7 @@
     if (!ONLINE || !fbDB || !currentUser) return;
     var s = getStats();
     var doc = {
-      displayName: ER.getPlayerName(),
+      displayName: (ER.getPlayerName() || "").split(" ")[0] || "Befleckter",
       photoURL: currentUser.photoURL || "",
       stats: s,
       achievements: getUnlocked(),
@@ -218,12 +251,12 @@
       furthestStage: s.furthestStage || 0,
       updatedAt: (firebase.firestore && firebase.firestore.FieldValue ? firebase.firestore.FieldValue.serverTimestamp() : Date.now())
     };
-    try { fbDB.collection("users").doc(currentUser.uid).set(doc, { merge: true }); } catch (e) { console.warn("[ER] cloudPush:", e); }
+    try { fbDB.collection(currentMode === "hard" ? "users_hard" : "users").doc(currentUser.uid).set(doc, { merge: true }); } catch (e) { console.warn("[ER] cloudPush:", e); }
   }
 
   function cloudSyncOnLogin() {
     if (!ONLINE || !fbDB || !currentUser) return;
-    fbDB.collection("users").doc(currentUser.uid).get().then(function (snap) {
+    fbDB.collection(currentMode === "hard" ? "users_hard" : "users").doc(currentUser.uid).get().then(function (snap) {
       var local = getStats();
       var localAch = getUnlocked();
       if (snap.exists) {
@@ -245,7 +278,8 @@
         saveUnlocked(ach);
       }
       // Namen aus Google übernehmen, falls vorhanden
-      if (currentUser.displayName && !lsGet(NAME_KEY, null)) lsSet(NAME_KEY, currentUser.displayName);
+      // Nur Vorname aus Google-Account übernehmen
+      if (currentUser.displayName && !lsGet(NAME_KEY, null)) { var fn = currentUser.displayName.split(" ")[0]; lsSet(NAME_KEY, fn); }
       checkAchievements();
       cloudPush();
     }).catch(function (e) { console.warn("[ER] Login-Sync:", e); });
