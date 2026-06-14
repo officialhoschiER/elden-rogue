@@ -203,11 +203,36 @@
       status_heading: "STATUS",
 
       // Hard Mode & Challenge Achievements
+      ach_complete_10_nm: "Veteran", ach_complete_10_ds: "Schließe 10 Runs ab.",
+      ach_complete_25_nm: "Legende", ach_complete_25_ds: "Schließe 25 Runs ab.",
+      ach_hard_5_nm: "Masochist", ach_hard_5_ds: "Schließe Hard-Mode 5x ab.",
+      ach_malenia_nm: "Scarlet Bloom", ach_malenia_ds: "Besiege Malenia.",
+      ach_loretta_nm: "Ritterin gefallen", ach_loretta_ds: "Besiege Loretta.",
+      ach_niall_nm: "Kommandant besiegt", ach_niall_ds: "Besiege Commander Niall.",
+      ach_death_100_nm: "Unsterblich", ach_death_100_ds: "Stirb 100 Mal.",
+      ach_win_2500_nm: "Kriegsgott", ach_win_2500_ds: "Gewinne 2500 Kämpfe.",
+      ach_all_bosses_nm: "Götterdämmerung", ach_all_bosses_ds: "Besiege jeden Halbgott mindestens einmal.",
       ach_hard_lord_nm: "Wahrer Elden Lord", ach_hard_lord_ds: "Schließe einen Hard-Mode-Run ab.",
       ach_hard_no_death_nm: "Flawless", ach_hard_no_death_ds: "Schließe Hard-Mode ab, ohne zu sterben.",
       ach_challenge_noarmor_nm: "Nacktläufer", ach_challenge_noarmor_ds: "Schließe einen No-Armor-Run ab.",
       ach_challenge_noblaidd_nm: "Einsamer Wolf", ach_challenge_noblaidd_ds: "Schließe einen No-Blaidd-Run ab.",
       ach_challenge_auto_nm: "Zuschauer", ach_challenge_auto_ds: "Schließe einen Auto-Battle-Run ab.",
+
+      // Haligtree Challenge
+      node_fortress: "Festung: Besiege den Kommandanten für eine Medaillonhälfte!",
+      node_15: "Festung: Besiege den Kommandanten für eine Medaillonhälfte!",
+      fortress_victory_title: "🏰 Festung erobert!",
+      fortress_victory_desc: "Du hast den Kommandanten bezwungen und eine Haligtree-Medaillonhälfte erhalten!\n\nMedaillonhälften: {n} / 2",
+      haligtree_enter_title: "🌳 Der Haligtree ruft",
+      haligtree_enter_desc: "Beide Medaillonhälften vereint! Der geheime Pfad zum Haligtree öffnet sich.\nMalenia wartet am Ende...",
+      malenia_phase2_transition: "\n✨ Malenia erhebt sich... Scharlachfäule umhüllt ihren Körper... \n⚔️ Phase 2: Malenia, Göttin der Fäulnis!",
+      malenia_victory_title: "🦋 Lord of the Haligtree",
+      malenia_victory_desc: "Malenia ist gefallen. Du hast den Haligtree bezwungen und bist nun Lord of the Haligtree!",
+      challenge_haligtree: "Haligtree",
+      challenge_haligtree_desc: "Finde 2 Festungen, besiege ihre Kommandanten und betritt den geheimen Haligtree. Malenia wartet.",
+      ach_challenge_haligtree_nm: "Lord of the Haligtree", ach_challenge_haligtree_ds: "Besiege Malenia im Haligtree-Challenge.",
+      weapon_halo_scythe: "Halo Scythe",
+      tal_halo_scythe: "Halo Scythe",
 
       // Run Save & Challenges
       btn_continue: "Run fortsetzen",
@@ -537,11 +562,36 @@
       status_heading: "STATUS",
 
       // Hard Mode & Challenge Achievements
+      ach_complete_10_nm: "Veteran", ach_complete_10_ds: "Complete 10 runs.",
+      ach_complete_25_nm: "Legend", ach_complete_25_ds: "Complete 25 runs.",
+      ach_hard_5_nm: "Masochist", ach_hard_5_ds: "Complete Hard Mode 5 times.",
+      ach_malenia_nm: "Scarlet Bloom", ach_malenia_ds: "Defeat Malenia.",
+      ach_loretta_nm: "Knight Fallen", ach_loretta_ds: "Defeat Loretta.",
+      ach_niall_nm: "Commander Down", ach_niall_ds: "Defeat Commander Niall.",
+      ach_death_100_nm: "Immortal", ach_death_100_ds: "Die 100 times.",
+      ach_win_2500_nm: "God of War", ach_win_2500_ds: "Win 2500 fights.",
+      ach_all_bosses_nm: "Twilight of the Gods", ach_all_bosses_ds: "Defeat every demigod at least once.",
       ach_hard_lord_nm: "True Elden Lord", ach_hard_lord_ds: "Complete a Hard Mode run.",
       ach_hard_no_death_nm: "Flawless", ach_hard_no_death_ds: "Complete Hard Mode without dying.",
       ach_challenge_noarmor_nm: "Naked Runner", ach_challenge_noarmor_ds: "Complete a No Armor run.",
       ach_challenge_noblaidd_nm: "Lone Wolf", ach_challenge_noblaidd_ds: "Complete a No Blaidd run.",
       ach_challenge_auto_nm: "Spectator", ach_challenge_auto_ds: "Complete an Auto-Battle run.",
+
+      // Haligtree Challenge
+      node_fortress: "Fortress: Defeat the commander for a medallion half!",
+      node_15: "Fortress: Defeat the commander for a medallion half!",
+      fortress_victory_title: "🏰 Fortress Conquered!",
+      fortress_victory_desc: "You defeated the commander and obtained a Haligtree Medallion half!\n\nMedallion halves: {n} / 2",
+      haligtree_enter_title: "🌳 The Haligtree Beckons",
+      haligtree_enter_desc: "Both medallion halves united! The secret path to the Haligtree opens.\nMalenia awaits at the end...",
+      malenia_phase2_transition: "\n✨ Malenia rises again... Scarlet Rot engulfs her body... \n⚔️ Phase 2: Malenia, Goddess of Rot!",
+      malenia_victory_title: "🦋 Lord of the Haligtree",
+      malenia_victory_desc: "Malenia has fallen. You conquered the Haligtree and became Lord of the Haligtree!",
+      challenge_haligtree: "Haligtree",
+      challenge_haligtree_desc: "Find 2 fortresses, defeat their commanders, and enter the secret Haligtree. Malenia awaits.",
+      ach_challenge_haligtree_nm: "Lord of the Haligtree", ach_challenge_haligtree_ds: "Defeat Malenia in the Haligtree Challenge.",
+      weapon_halo_scythe: "Halo Scythe",
+      tal_halo_scythe: "Halo Scythe",
 
       // Run Save & Challenges
       btn_continue: "Continue Run",
