@@ -153,6 +153,7 @@
 
     .btn-cam-spot { background: transparent; color: #666; border: 1px solid #333; padding: 8px 16px; font-family: sans-serif; font-size: 0.75rem; cursor: pointer; border-radius: 4px; transition: all 0.2s; }
     .btn-cam-spot:hover { border-color: var(--gold); color: var(--gold); }
+    .email-box { background: var(--panel); border: 1px solid var(--gold); border-radius: 8px; padding: 28px 32px; width: 340px; text-align: center; }
     .cam-overlay { position: fixed; inset: 0; background: rgba(5,5,5,0.95); z-index: 600; display: none; justify-content: flex-end; align-items: flex-end; padding: 30px; }
     .cam-overlay.open { display: flex; }
     .cam-box { text-align: center; color: #888; font-family: sans-serif; font-size: 0.85rem; }
@@ -217,6 +218,21 @@
   <div style="margin-top:16px; text-align:center;">
     <button class="btn-cam-spot" id="btn-cam" onclick="document.getElementById('cam-overlay').classList.toggle('open')">🎥 Streamer Cam-Spot</button>
   </div>
+
+<div class="cam-overlay" id="email-login-modal">
+  <div class="email-box" onclick="event.stopPropagation()">
+    <div style="color:var(--gold); font-family:'Mantinia',serif; font-size:1.3rem; letter-spacing:3px; margin-bottom:16px;">✉ E-MAIL LOGIN</div>
+    <div id="email-error" style="color:#e74c3c; font-size:0.8rem; font-family:sans-serif; margin-bottom:8px; display:none;"></div>
+    <input type="text" id="email-name" class="name-input" placeholder="Name (nur bei Registrierung)" style="width:100%; margin-bottom:8px;">
+    <input type="email" id="email-input" class="name-input" placeholder="E-Mail" style="width:100%; margin-bottom:8px;">
+    <input type="password" id="email-pass" class="name-input" placeholder="Passwort" style="width:100%; margin-bottom:14px;">
+    <div style="display:flex; gap:8px; justify-content:center;">
+      <button class="btn-mini" onclick="emailLogin()">Anmelden</button>
+      <button class="btn-mini" style="border-color:#2ecc71; color:#2ecc71;" onclick="emailRegister()">Registrieren</button>
+      <button class="btn-mini" style="border-color:#888; color:#888;" onclick="document.getElementById('email-login-modal').classList.remove('open')">Abbrechen</button>
+    </div>
+  </div>
+</div>
 
 <div class="cam-overlay" id="cam-overlay" onclick="this.classList.remove('open')">
   <div class="cam-close"><button class="btn-mini" onclick="document.getElementById('cam-overlay').classList.remove('open')">✕ Schließen</button></div>
@@ -446,8 +462,9 @@
       document.getElementById("btn-logout").onclick = function () { ER.signOut(); };
     } else if (online) {
       left.innerHTML = '<div><div class="account-name">' + (window.i18n ? t("unregistered") : "Nicht angemeldet") + '</div><div class="account-sub">' + (window.i18n ? t("unregistered_sub") : "Melde dich an, um deinen Fortschritt online zu speichern") + '</div></div>';
-      right.innerHTML = '<button class="btn-google" id="btn-google"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="">' + (window.i18n ? t("btn_login") : "Mit Google anmelden") + '</button>';
+      right.innerHTML = '<button class="btn-google" id="btn-google"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="">' + (window.i18n ? t("btn_login") : "Google") + '</button> <button class="btn-mini" id="btn-email-open">✉ E-Mail</button>';
       document.getElementById("btn-google").onclick = function () { ER.signInWithGoogle().catch(function(){}); };
+      document.getElementById("btn-email-open").onclick = function () { document.getElementById("email-login-modal").classList.add("open"); };
     } else {
       var name = (window.ER ? ER.getPlayerName() : (window.i18n ? t("lb_th_player") : "Befleckter"));
       left.innerHTML = '<div><div class="account-name">' + (window.i18n ? t("local_mode") : "Lokaler Modus") + '</div><div class="account-sub">' + (window.i18n ? t("local_mode_sub") : "Fortschritt wird im Browser gespeichert") + '</div></div>';
@@ -495,7 +512,11 @@
 
   /* ===== Achievements ===== */
   function ladeAchievements() {
-    if (!window.ER) return;
+    if (!window.ER) { 
+      document.getElementById("ach-grid").innerHTML = '<div style="color:#888; text-align:center; padding:20px; font-family:sans-serif;">Achievements konnten nicht geladen werden. Bitte Seite neu laden.</div>';
+      return; 
+    }
+    try {
     ER.setMode(achMode);
     var s = ER.getStats();
     var statGrid = document.getElementById("stat-grid");
@@ -519,11 +540,41 @@
         '<div class="ic">' + (a.unlocked ? a.icon : "🔒") + '</div>' +
         '<div><div class="nm">' + a.name + '</div><div class="ds">' + a.desc + '</div></div></div>';
     }).join("");
+    } catch(e) { console.error("[ER] Achievement-Fehler:", e); document.getElementById("ach-grid").innerHTML = '<div style="color:#e74c3c; text-align:center; padding:20px;">Fehler beim Laden der Achievements.</div>'; }
   }
 
   /* ===== Init ===== */
   if (window.ER) { ER.onUserChange(renderAccount); }
   else { document.getElementById("account-left").innerHTML = '<div><div class="account-name">Lokaler Modus</div><div class="account-sub">Fortschritt wird im Browser gespeichert</div></div>'; }
+
+  function emailLogin() {
+    var email = document.getElementById("email-input").value.trim();
+    var pass = document.getElementById("email-pass").value;
+    var errEl = document.getElementById("email-error");
+    if (!email || !pass) { errEl.style.display = "block"; errEl.innerText = "Bitte E-Mail und Passwort eingeben."; return; }
+    ER.signInWithEmail(email, pass).then(function() {
+      document.getElementById("email-login-modal").classList.remove("open");
+    }).catch(function(e) {
+      errEl.style.display = "block";
+      errEl.innerText = e.code === "auth/wrong-password" ? "Falsches Passwort." : (e.code === "auth/user-not-found" ? "Kein Konto mit dieser E-Mail." : e.message);
+    });
+  }
+  function emailRegister() {
+    var name = document.getElementById("email-name").value.trim() || "Befleckter";
+    var email = document.getElementById("email-input").value.trim();
+    var pass = document.getElementById("email-pass").value;
+    var errEl = document.getElementById("email-error");
+    if (!email || !pass) { errEl.style.display = "block"; errEl.innerText = "Bitte E-Mail und Passwort eingeben."; return; }
+    if (pass.length < 6) { errEl.style.display = "block"; errEl.innerText = "Passwort muss mindestens 6 Zeichen haben."; return; }
+    ER.signUpWithEmail(email, pass, name).then(function() {
+      document.getElementById("email-login-modal").classList.remove("open");
+    }).catch(function(e) {
+      errEl.style.display = "block";
+      errEl.innerText = e.code === "auth/email-already-in-use" ? "Diese E-Mail ist bereits registriert." : e.message;
+    });
+  }
+  window.emailLogin = emailLogin;
+  window.emailRegister = emailRegister;
 
   function checkOverwrite(url) {
     var save = null;

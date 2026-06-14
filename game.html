@@ -220,7 +220,7 @@ h1, h2, h3, .btn-menu, .btn-combat, .btn-social, .game-author-tag, #region-displ
     .weapon-display { margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
     .gear-row { display: flex; gap: 12px; justify-content: center; align-items: flex-start; margin-top: 10px; }
     .gear-row .weapon-display { margin-top: 0; flex: 1; }
-    .weapon-img-box { position: relative; width: 66px; height: 66px; border: 1px solid var(--border-color); border-radius: 4px; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; overflow: hidden; margin: 0 auto; }
+    .weapon-img-box { position: relative; width: 82px; height: 82px; border: 1px solid var(--border-color); border-radius: 4px; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; overflow: hidden; margin: 0 auto; }
     .weapon-img-box img { width: 100%; height: 100%; object-fit: contain; }
     .weapon-fallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; }
     .weapon-name-line { font-family: 'Georgia', serif; font-size: 0.95rem; }
@@ -429,8 +429,8 @@ h1, h2, h3, .btn-menu, .btn-combat, .btn-social, .game-author-tag, #region-displ
       <div id="medallion-display" style="display:none; margin-top:6px; border-top:1px solid #2a2a2a; padding-top:5px;">
         <div style="font-size:0.65rem; color:#888; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:3px;">Haligtree Medallion</div>
         <div style="display:flex; gap:8px; justify-content:center;">
-          <img id="medal-left" src="images/ER_Icon_Key_Item_Haligtree_Secret_Medallion_(Right).webp" style="width:32px;height:32px;opacity:0.15;" onerror="this.style.display='none'">
-          <img id="medal-right" src="images/ER_Icon_Key_Item_Haligtree_Secret_Medallion_29.webp" style="width:32px;height:32px;opacity:0.15;" onerror="this.style.display='none'">
+          <img id="medal-left" src="images/ER_Icon_Key_Item_Haligtree_Secret_Medallion_29.webp" style="width:32px;height:32px;opacity:0.15;" onerror="this.style.display='none'">
+          <img id="medal-right" src="images/ER_Icon_Key_Item_Haligtree_Secret_Medallion_(Right).webp" style="width:32px;height:32px;opacity:0.15;" onerror="this.style.display='none'">
         </div>
       </div>
       <div style="margin-top:6px; border-top:1px solid #2a2a2a; padding-top:5px; font-size:0.72rem; color:#3498db; font-weight:bold;" id="quest-progress-text">Blaidd: 0 / 4</div>
@@ -912,7 +912,7 @@ function platziereFestungen(karte, regionName) {
   if (fortressPlacedRegions.length >= 2) return karte;
   if (fortressPlacedRegions.includes(regionName)) return karte;
   // Regionen 1-5 (Limgrave bis FarumAzula), Chance: 60% pro Region
-  let validRegions = ["Limgrave","Caelid","Leyndell","Mountaintops","FarumAzula"];
+  let validRegions = ["Caelid","Leyndell","Mountaintops","FarumAzula"];
   if (!validRegions.includes(regionName)) return karte;
   let remaining = 2 - fortressPlacedRegions.length;
   let regionsLeft = validRegions.length - validRegions.indexOf(regionName);
@@ -1471,8 +1471,8 @@ function klickeKnoten(ebene, knoten) {
     gegnerName = "Blaidd, der Halbwolf"; let bScale = 1 + questProgress * (hardMode ? 0.75 : 0.5); gegnerMaxHp = Math.round(80 * rMult * bScale); gegnerSchaden = Math.round(15 * rMult * bScale); }
   else if (knoten.typ === 15) {
     // Festungskampf (Haligtree Challenge) — wie ein normaler Kampf
-    if (medallionHalves === 0) { gegnerName = "Loretta, Knight of the Haligtree"; gegnerMaxHp = Math.round(450 * rMult); gegnerSchaden = Math.round(55 * rMult); }
-    else { gegnerName = "Commander Niall"; gegnerMaxHp = Math.round(500 * rMult); gegnerSchaden = Math.round(60 * rMult); }
+    if (medallionHalves === 0) { gegnerName = "Loretta, Knight of the Haligtree"; gegnerMaxHp = Math.round(280 * rMult); gegnerSchaden = Math.round(35 * rMult); }
+    else { gegnerName = "Commander Niall"; gegnerMaxHp = Math.round(380 * rMult); gegnerSchaden = Math.round(45 * rMult); }
   }
   else if (knoten.typ === 14) { let mb = gibAktuellenMiniboss(); gegnerName = mb.name; gegnerMaxHp = Math.round(78 * rMult); gegnerSchaden = Math.round(13 * rMult); }
   else if (knoten.typ === 5) {
