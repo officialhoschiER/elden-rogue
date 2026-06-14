@@ -1801,12 +1801,11 @@ function kampfGewonnen() {
   }
   // Malenia Phase 2 besiegt = Haligtree Ending
   if (gegnerName === "Malenia, Goddess of Rot") {
-    loescheRunSave();
     if (window.ER) { ER.bossKilled("Malenia, Goddess of Rot"); ER.gameCompleted(); if (activeChallenge) ER.challengeCompleted(activeChallenge); }
-    oeffneStatPopup(t("malenia_victory_title"), t("malenia_victory_desc"), 8); return;
+    oeffneAbschlussPopup(t("malenia_victory_title"), t("malenia_victory_desc")); return;
   }
 
-  if (gegnerName === "Eldenbiest") { loescheRunSave(); oeffneStatPopup(t("elden_lord_title"), t("boss_beast_win"), 8); return; }
+  if (gegnerName === "Eldenbiest") { oeffneAbschlussPopup(t("elden_lord_title"), t("boss_beast_win")); return; }
 
   if (aktuellerKnotenTyp === 1) {
     let hpBonus = Math.round(spielerMaxHp * (hardMode ? 0.05 : 0.1)); spielerMaxHp += hpBonus; spielerHp += hpBonus;
@@ -2009,6 +2008,19 @@ function oeffneStatPopup(titel, text, naechsteEbene) {
     <h3 style="color: var(--gold); font-size:1.6rem; margin-top:0; letter-spacing:2px; font-family: 'Mantinia', serif;">${titel}</h3>
     <p style="color:#ddd; font-size:0.95rem; font-family: sans-serif; white-space: pre-line; line-height:1.5;">${text}</p>
     <button class="btn-modal-action" onclick="bestaetigeStufe(${naechsteEbene})">${t("btn_continue")}</button>
+  `;
+  overlay.style.display = "flex";
+}
+
+// Run ist ABGESCHLOSSEN (Sieg) – kein Weiterspielen, kein Speichern.
+// Zeigt nur einen Button zurück ins Hauptmenü.
+function oeffneAbschlussPopup(titel, text) {
+  loescheRunSave(); // abgeschlossener Run wird nicht mehr gespeichert/fortgesetzt
+  let overlay = document.getElementById("popup-overlay"); let content = document.getElementById("popup-content");
+  content.innerHTML = `
+    <h3 style="color: var(--gold); font-size:1.6rem; margin-top:0; letter-spacing:2px; font-family: 'Mantinia', serif;">${titel}</h3>
+    <p style="color:#ddd; font-size:0.95rem; font-family: sans-serif; white-space: pre-line; line-height:1.5;">${text}</p>
+    <a href="index.html" class="btn-modal-action" style="display:inline-block; text-decoration:none;" onclick="loescheRunSave()">${t("btn_main_menu")}</a>
   `;
   overlay.style.display = "flex";
 }
