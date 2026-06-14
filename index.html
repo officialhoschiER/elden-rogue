@@ -517,7 +517,7 @@
       return; 
     }
     try {
-    ER.setMode(achMode);
+    if (ER.setMode) ER.setMode(achMode);
     var s = ER.getStats();
     var statGrid = document.getElementById("stat-grid");
     
@@ -552,6 +552,7 @@
     var pass = document.getElementById("email-pass").value;
     var errEl = document.getElementById("email-error");
     if (!email || !pass) { errEl.style.display = "block"; errEl.innerText = "Bitte E-Mail und Passwort eingeben."; return; }
+    if (!ER.signInWithEmail) { errEl.style.display = "block"; errEl.innerText = "E-Mail-Login nicht verfügbar. Bitte eldenrogue-online.js aktualisieren."; return; }
     ER.signInWithEmail(email, pass).then(function() {
       document.getElementById("email-login-modal").classList.remove("open");
     }).catch(function(e) {
@@ -566,6 +567,7 @@
     var errEl = document.getElementById("email-error");
     if (!email || !pass) { errEl.style.display = "block"; errEl.innerText = "Bitte E-Mail und Passwort eingeben."; return; }
     if (pass.length < 6) { errEl.style.display = "block"; errEl.innerText = "Passwort muss mindestens 6 Zeichen haben."; return; }
+    if (!ER.signUpWithEmail) { errEl.style.display = "block"; errEl.innerText = "E-Mail-Registrierung nicht verfügbar. Bitte eldenrogue-online.js aktualisieren."; return; }
     ER.signUpWithEmail(email, pass, name).then(function() {
       document.getElementById("email-login-modal").classList.remove("open");
     }).catch(function(e) {
