@@ -53,7 +53,7 @@
     armorsFound: 0, blaiddDefeats: 0, gamesCompleted: 0, furthestStage: 0,
     bestRunBosses: 0, bestScore: 0, flasksDrunk: 0, bossKills: {},
     // --- NEU: Hard-Mode & Challenges ---
-    hardCompleted: 0, hardNoDeath: 0, challenges: {},
+    hardCompleted: 0, challenges: {},
     // --- NEU: getrennte Hard-Mode-Bestenliste ---
     bestScoreHard: 0, bestRunBossesHard: 0, furthestStageHard: 0
   };
@@ -70,10 +70,9 @@
   function getUnlocked() { return lsGet(ACH_KEY, []); }
   function saveUnlocked(a) { lsSet(ACH_KEY, a); }
 
-  // Aktueller Run-Modus + ob im Run gestorben (überlebt endRun, damit
-  // hardCompleted() nach gameCompleted() noch korrekt lesen kann)
+  // Aktueller Run-Modus (überlebt endRun, damit hardCompleted() nach
+  // gameCompleted() noch den richtigen Modus kennt)
   let runMode = (getRun().mode === "hard") ? "hard" : "normal";
-  let runDied = false;
 
   /* ====== 3) ACHIEVEMENTS ====== */
   // Liste der Halbgötter für das "Götterdämmerung"-Achievement
@@ -117,11 +116,9 @@
     { id: "complete_25", name: "Legende",               icon: "🏆", desc: "Schließe 25 Runs ab.",                  check: s => s.gamesCompleted >= 25 },
     { id: "hard_lord",  name: "Wahrer Elden Lord",      icon: "🔴", desc: "Schließe einen Hard-Mode-Run ab.",        check: s => s.hardCompleted >= 1 },
     { id: "hard_5",     name: "Masochist",              icon: "🔁", desc: "Schließe Hard-Mode 5x ab.",              check: s => s.hardCompleted >= 5 },
-    { id: "hard_no_death", name: "Flawless",            icon: "💎", desc: "Schließe Hard-Mode ab, ohne zu sterben.", check: s => s.hardNoDeath >= 1 },
     { id: "challenge_noarmor",   name: "Nacktläufer",   icon: "🩲", desc: "Schließe einen No-Armor-Run ab.",        check: s => (s.challenges.noarmor || 0) >= 1 },
     { id: "challenge_noblaidd",  name: "Einsamer Wolf", icon: "🐺", desc: "Schließe einen No-Blaidd-Run ab.",       check: s => (s.challenges.noblaidd || 0) >= 1 },
     { id: "challenge_auto",      name: "Zuschauer",     icon: "🍿", desc: "Schließe einen Auto-Battle-Run ab.",      check: s => (s.challenges.autobattle || 0) >= 1 },
-    { id: "challenge_haligtree", name: "Lord of the Haligtree", icon: "🌳", desc: "Besiege Malenia im Haligtree-Challenge.", check: s => (s.challenges.haligtree || 0) >= 1 },
     { id: "first_death",name: "Du bist gestorben",      icon: "💀", desc: "Stirb zum ersten Mal.",                  check: s => s.deaths >= 1 },
     { id: "death_50",   name: "Hartnäckig",             icon: "⚰️", desc: "Stirb 50 Mal und gib nicht auf.",        check: s => s.deaths >= 50 },
     { id: "death_100",  name: "Unsterblich",            icon: "👻", desc: "Stirb 100 Mal.",                         check: s => s.deaths >= 100 },
@@ -174,7 +171,6 @@
     /* --- Run-Lebenszyklus --- */
     startRun: function (mode) {
       runMode = (mode === "hard") ? "hard" : "normal";
-      runDied = false;
       saveRun({ stage: 1, bosses: 0, fights: 0, mode: runMode });
       bump("runsStarted");
       setMax("furthestStage", 1);
@@ -202,7 +198,7 @@
     eliteKilled:  function () { bump("elitesKilled"); },
     minibossKilled: function () { bump("minibossesKilled"); },
     invaderKilled:  function () { bump("invadersKilled"); },
-    death:        function () { runDied = true; bump("deaths"); ER.endRun(); },
+    death:        function () { bump("deaths"); ER.endRun(); },
     dungeonCleared: function () { bump("dungeonsCleared"); },
     talismanFound: function () { bump("talismansFound"); },
     weaponFound:  function () { bump("weaponsFound"); },
@@ -215,7 +211,6 @@
     // NEU: Hard-Mode-Abschluss (wird nach gameCompleted aufgerufen)
     hardCompleted: function () {
       bump("hardCompleted");
-      if (!runDied) bump("hardNoDeath");
     },
     // NEU: Challenge-Abschluss. ch = "noarmor" | "noblaidd" | "autobattle" | "haligtree"
     challengeCompleted: function (ch) {
