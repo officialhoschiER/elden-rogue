@@ -1747,7 +1747,7 @@ function kampfGewonnen() {
       if (hardMode) ER.hardCompleted();
       if (activeChallenge) ER.challengeCompleted(activeChallenge);
     }
-    else if (aktuellerKnotenTyp === 5) ER.bossKilled(gegnerName);
+    else if (aktuellerKnotenTyp === 5 && !inSubDungeon) ER.bossKilled(gegnerName);
     else if (aktuellerKnotenTyp === 15) ER.bossKilled(gegnerName);
     else if (aktuellerKnotenTyp === 14) ER.minibossKilled();
     else if (aktuellerKnotenTyp === 1) ER.eliteKilled();
