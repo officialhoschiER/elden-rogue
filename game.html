@@ -7,8 +7,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-  <script src="lang.js"></script>
-  <script src="eldenrogue-online.js"></script>
+  <script src="lang.js?v=1.4"></script>
+  <script src="eldenrogue-online.js?v=1.4"></script>
   <style>
     /* Lokale Font-Einbindung aus dem fonts-Ordner */
     @font-face {
@@ -540,6 +540,23 @@ const urlParams = new URLSearchParams(window.location.search);
 const hardMode = urlParams.get("mode") === "hard";
 const resumeRun = urlParams.get("resume") === "true";
 let activeChallenge = urlParams.get("challenge") || "";
+
+// ===== TEST-/DEBUG-MODUS: 9999 Schaden pro Treffer =====
+// Aktivierung über die URL, z.B.:  game.html?debug=1   oder kombiniert:  game.html?challenge=haligtree&debug=1
+const DEBUG_DMG = ["1", "true", "on", "9999"].includes((urlParams.get("debug") || urlParams.get("cheat") || "").toLowerCase());
+if (DEBUG_DMG) {
+  console.info("[ER] DEBUG-Schaden AKTIV: 9999 pro Treffer");
+  var _zeigeDebugBadge = function () {
+    if (!document.body || document.getElementById("er-debug-badge")) return;
+    var b = document.createElement("div");
+    b.id = "er-debug-badge";
+    b.textContent = "🛠️ DEBUG: 9999 DMG";
+    b.style.cssText = "position:fixed;bottom:8px;right:8px;z-index:100000;background:#7a1f1f;color:#fff;font:bold 12px sans-serif;padding:4px 9px;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.6);pointer-events:none;letter-spacing:0.5px;";
+    document.body.appendChild(b);
+  };
+  if (document.readyState === "loading") window.addEventListener("DOMContentLoaded", _zeigeDebugBadge);
+  else _zeigeDebugBadge();
+}
 let spielerHp = 100; let spielerMaxHp = 100; let spielerFlasks = 3; let maxKlassenFlasks = 3; let estusHeilProzent = hardMode ? 0.25 : 0.35; let gewaehlteKlasse = ""; let basisAusweichChance = 0.0;
 let waffenName = ""; let waffenSchaden = 0; let waffenUpgrade = 0;
 let waffenRaritaet = "common"; let waffenSchadensarten = ["Normal"];
@@ -578,7 +595,7 @@ function speichereRun() {
     ruestungName, ruestungRaritaet, ruestungReduktion, ruestungBild,
     ausgeruesteteTalismane, maxTalismanSlots,
     hatGodrickRune, hatRadahnRune, hatMorgottRune, aktiveRune,
-    questProgress, medallionHalves, fortressPlacedRegions, currentAffinity, affinityHits, completedDungeonsCount,
+    questProgress, medallionHalves, fortressPlacedRegions, fortressRegionsPlan, currentAffinity, affinityHits, completedDungeonsCount,
     backpackItems, activeDungeonBuff, dungeonBuffRemainingCombats,
     aktuelleRegion, aktuelleEbene, geloesieKnotenIds, aktuellerKnotenId,
     netzKarte, inSubDungeon, mainMapState
@@ -599,7 +616,7 @@ function ladeGespeichertenRun() {
     ruestungName=d.ruestungName; ruestungRaritaet=d.ruestungRaritaet; ruestungReduktion=d.ruestungReduktion; ruestungBild=d.ruestungBild||"";
     ausgeruesteteTalismane=d.ausgeruesteteTalismane||[]; maxTalismanSlots=d.maxTalismanSlots;
     hatGodrickRune=d.hatGodrickRune; hatRadahnRune=d.hatRadahnRune; hatMorgottRune=d.hatMorgottRune; aktiveRune=d.aktiveRune;
-    questProgress=d.questProgress; medallionHalves=d.medallionHalves||0; fortressPlacedRegions=d.fortressPlacedRegions||[]; currentAffinity=d.currentAffinity; affinityHits=d.affinityHits; completedDungeonsCount=d.completedDungeonsCount;
+    questProgress=d.questProgress; medallionHalves=d.medallionHalves||0; fortressPlacedRegions=d.fortressPlacedRegions||[]; fortressRegionsPlan=d.fortressRegionsPlan||null; currentAffinity=d.currentAffinity; affinityHits=d.affinityHits; completedDungeonsCount=d.completedDungeonsCount;
     backpackItems=d.backpackItems||[null,null,null]; activeDungeonBuff=d.activeDungeonBuff; dungeonBuffRemainingCombats=d.dungeonBuffRemainingCombats;
     aktuelleRegion=d.aktuelleRegion; aktuelleEbene=d.aktuelleEbene; geloesieKnotenIds=d.geloesieKnotenIds||[]; aktuellerKnotenId=d.aktuellerKnotenId;
     netzKarte=d.netzKarte||[]; inSubDungeon=d.inSubDungeon; mainMapState=d.mainMapState;
@@ -920,22 +937,25 @@ let aktuelleRegion = "Limgrave"; let aktuelleEbene = 1; let geloesieKnotenIds = 
 
 window.addEventListener('resize', zeichneLinien);
 
-// Haligtree-Challenge: 2 Festungen auf die Karte setzen (max 1 pro Region)
+// Haligtree-Challenge: GARANTIERT 2 Festungen in 2 verschiedenen Regionen (ab Phase 2).
+// Die frühere Region bekommt Loretta (1. Medaillonhälfte), die spätere Niall (2. Hälfte).
 let fortressPlacedRegions = [];
+let fortressRegionsPlan = null; // welche 2 Regionen Festungen erhalten (einmal pro Run festgelegt)
+const FESTUNGS_REGIONEN = ["Caelid", "Leyndell", "Mountaintops", "FarumAzula"]; // Regionen 2–5
+function planeFestungsRegionen() {
+  var pool = FESTUNGS_REGIONEN.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 2);
+  // nach Spielreihenfolge sortieren: frühere Region zuerst (Loretta), spätere danach (Niall)
+  pool.sort(function (a, b) { return FESTUNGS_REGIONEN.indexOf(a) - FESTUNGS_REGIONEN.indexOf(b); });
+  return pool;
+}
 function platziereFestungen(karte, regionName) {
   if (activeChallenge !== "haligtree") return karte;
-  if (fortressPlacedRegions.length >= 2) return karte;
-  if (fortressPlacedRegions.includes(regionName)) return karte;
-  // Regionen 1-5 (Limgrave bis FarumAzula), Chance: 60% pro Region
-  let validRegions = ["Caelid","Leyndell","Mountaintops","FarumAzula"];
-  if (!validRegions.includes(regionName)) return karte;
-  let remaining = 2 - fortressPlacedRegions.length;
-  let regionsLeft = validRegions.length - validRegions.indexOf(regionName);
-  let chance = Math.min(1.0, remaining / regionsLeft + 0.1);
-  if (Math.random() > chance) return karte;
-  // Einen passenden Knoten finden (nicht Boss, nicht Gnade, nicht Dungeon)
+  if (!fortressRegionsPlan) fortressRegionsPlan = planeFestungsRegionen();
+  if (!fortressRegionsPlan.includes(regionName)) return karte;       // diese Region ist nicht eingeplant
+  if (fortressPlacedRegions.includes(regionName)) return karte;      // hier steht schon eine Festung
+  // passenden Knoten finden (nicht Boss/Gnade/Dungeon, nicht erste/letzte Ebene)
   let candidates = [];
-  karte.forEach((zeile, zi) => { zeile.knoten.forEach((k, ki) => { if (![4,5,10].includes(k.typ) && zi > 0 && zi < karte.length-1) candidates.push(k); }); });
+  karte.forEach((zeile, zi) => { zeile.knoten.forEach((k) => { if (![4,5,10].includes(k.typ) && zi > 0 && zi < karte.length-1) candidates.push(k); }); });
   if (candidates.length === 0) return karte;
   let pick = candidates[Math.floor(Math.random() * candidates.length)];
   pick.typ = 15;
@@ -1138,7 +1158,7 @@ function direktNeustarten() {
   waffenUpgrade = 0; gelagerteWaffen = []; maxWaffenSlots = hardMode ? 0 : 1; besiegteWaechter = 0; waffenRaritaet = "common"; waffenSchadensarten = ["Normal"];
   ruestungName = t("no_armor"); ruestungRaritaet = "common"; ruestungReduktion = 0; ruestungBild = "";
   ausgeruesteteTalismane = []; maxTalismanSlots = hardMode ? 2 : 3; hatGodrickRune = false; hatRadahnRune = false; hatMorgottRune = false; aktiveRune = "keine";
-  questProgress = 0; medallionHalves = 0; fortressPlacedRegions = []; imKampf = false; gewaehlteKlasse = ""; aktionsSperre = false;
+  questProgress = 0; medallionHalves = 0; fortressPlacedRegions = []; fortressRegionsPlan = null; imKampf = false; gewaehlteKlasse = ""; aktionsSperre = false;
   playerHitsOnEnemy = 0; enemyIsStaggered = false; staggerVisualActive = false; nextHitBonusDamage = false;
   currentAffinity = "Keine"; affinityHits = 0; completedDungeonsCount = 0;
   backpackItems = [null, null, null]; activeDungeonBuff = null; dungeonBuffRemainingCombats = 0; inSubDungeon = false; mainMapState = null;
@@ -1285,7 +1305,7 @@ function updateUI() {
   if (aktiveRune === "morgott") { finalHpMultiplier += 1.0; } 
   
   let finaleAusweichChance = Math.min(hardMode ? 0.65 : 0.75, basisAusweichChance + tStats.extraRolle + runeRollBonus);
-  let finalMaxHp = Math.round((spielerMaxHp + runeHpBonus) * finalHpMultiplier); 
+  let finalMaxHp = berechneFinalMaxHp();
   if (spielerHp > finalMaxHp) spielerHp = finalMaxHp;
 
   let baseWeaponDmg = waffenSchaden + (waffenUpgrade * 5);
@@ -1452,10 +1472,7 @@ function klickeKnoten(ebene, knoten) {
   playerHitsOnEnemy = 0; enemyIsStaggered = false; staggerVisualActive = false; nextHitBonusDamage = false; affinityHits = 0;
 
   if (knoten.typ === 4) {
-    let tStats = berechneTalismanStats(); let runeHpBonus = (aktiveRune === "godrick" ? Math.round(spielerMaxHp * 0.25) : 0) + (aktiveRune === "radahn" ? Math.round(spielerMaxHp * 0.5) : 0);
-    let buffMult = (activeDungeonBuff === "hp" && dungeonBuffRemainingCombats > 0) ? 0.15 : 0.0;
-    let mult = 1.0 + tStats.bonusHpPercent + buffMult + (aktiveRune === "morgott" ? 1.0 : 0.0);
-    spielerHp = Math.round((spielerMaxHp + runeHpBonus) * mult); spielerFlasks = maxKlassenFlasks;
+    spielerHp = berechneFinalMaxHp(); spielerFlasks = maxKlassenFlasks;
     oeffneStatPopup(t("grace_title"), t("grace_desc"), ebene + 1); return;
   }
   if (knoten.typ === 6) { oeffneTalismanPopup(ebene + 1); return; }
@@ -1498,10 +1515,6 @@ function klickeKnoten(ebene, knoten) {
       else if (aktuelleRegion === "Leyndell") { gegnerName = "Morgott, der Omenkönig"; gegnerMaxHp = 680; gegnerSchaden = 45; }
       else if (aktuelleRegion === "Mountaintops") { gegnerName = "Feuerriese"; gegnerMaxHp = 920; gegnerSchaden = 58; }
       else if (aktuelleRegion === "FarumAzula") { gegnerName = "Maliketh, die Schwarze Klinge"; gegnerMaxHp = 1350; gegnerSchaden = 75; }
-      else if (aktuelleRegion === "AshenCapital" && activeChallenge === "haligtree" && medallionHalves >= 2) {
-        aktuelleRegion = "Haligtree"; aktuelleEbene = 1; geloesieKnotenIds = []; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("Haligtree");
-        oeffneStatPopup(t("haligtree_enter_title"), t("haligtree_enter_desc"), 1); return;
-      }
       else if (aktuelleRegion === "AshenCapital") { gegnerName = "Gideon Ofnir, der Allwissende"; gegnerMaxHp = 1600; gegnerSchaden = 85; }
       else if (aktuelleRegion === "Haligtree") {
         gegnerName = "Malenia, Blade of Miquella"; gegnerMaxHp = Math.round(2800 * rMult); gegnerSchaden = Math.round(120 * rMult);
@@ -1529,6 +1542,32 @@ function betreteDungeonEngine() {
   document.getElementById("popup-overlay").style.display = "none";
   mainMapState = { netz: netzKarte, ebene: aktuelleEbene, geloest: geloesieKnotenIds, aktuell: aktuellerKnotenId };
   inSubDungeon = true; aktuelleEbene = 1; geloesieKnotenIds = []; aktuellerKnotenId = null; netzKarte = generiereSubDungeonNetz(); baueKarteHTML(); updateUI();
+}
+
+// Haligtree-Challenge: nach Gideon den Spieler fragen, ob er das Medaillon hebt (Geheimpfad zu Malenia)
+function oeffneMedallionChoicePopup() {
+  let overlay = document.getElementById("popup-overlay"); let content = document.getElementById("popup-content");
+  content.innerHTML = `
+    <h3 style="color:#d4af37; font-size:1.6rem; margin-top:0; letter-spacing:2px; font-family:'Mantinia', serif;">${t("medallion_choice_title")}</h3>
+    <div style="display:flex; justify-content:center; gap:6px; margin:6px 0 4px;">
+      <img src="images/ER_Icon_Key_Item_Haligtree_Secret_Medallion_29.webp" style="width:48px;height:48px;" onerror="this.style.display='none'">
+      <img src="images/ER_Icon_Key_Item_Haligtree_Secret_Medallion_(Right).webp" style="width:48px;height:48px;" onerror="this.style.display='none'">
+    </div>
+    <p style="color:#ddd; font-size:0.95rem; font-family: sans-serif;">${t("medallion_choice_desc")}</p>
+    <button class="btn-modal-action" onclick="medallionHeben()">${t("medallion_choice_yes")}</button>
+    <button class="btn-modal-action" onclick="medallionAblehnen()" style="background:transparent; border:1px solid #6b5d3a; color:#b8a96f; margin-top:8px;">${t("medallion_choice_no")}</button>
+  `;
+  overlay.style.display = "flex";
+}
+function medallionHeben() {
+  document.getElementById("popup-overlay").style.display = "none";
+  aktuelleRegion = "Haligtree"; aktuelleEbene = 1; geloesieKnotenIds = []; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("Haligtree");
+  oeffneStatPopup(t("haligtree_enter_title"), t("haligtree_enter_desc"), 1);
+}
+function medallionAblehnen() {
+  document.getElementById("popup-overlay").style.display = "none";
+  aktuelleRegion = "EldenThrone"; aktuelleEbene = 1; geloesieKnotenIds = []; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("EldenThrone");
+  oeffneStatPopup(t("boss_gideon_title"), t("boss_gideon_win"), 1);
 }
 
 function looteDungeonChest(naechsteEbene) {
@@ -1671,7 +1710,7 @@ function spielerAngriff() {
     }
   }
 
-  let schaden = finalDmg + Math.floor(Math.random() * 5) - 2;
+  let schaden = DEBUG_DMG ? 9999 : (finalDmg + Math.floor(Math.random() * 5) - 2);
   gegnerHp = Math.max(0, gegnerHp - schaden);
 
   if (gegnerHp > 0) {
@@ -1720,10 +1759,8 @@ function spielerHeilen() {
   if (!imKampf || spielerHp <= 0 || aktionsSperre) return;
   if (spielerFlasks > 0) {
     aktionsSperre = true;
-    let tStats = berechneTalismanStats(); let runeHpBonus = (aktiveRune === "godrick" ? Math.round(spielerMaxHp * 0.25) : 0) + (aktiveRune === "radahn" ? Math.round(spielerMaxHp * 0.5) : 0);
-    let buffMult = (activeDungeonBuff === "hp" && dungeonBuffRemainingCombats > 0) ? 0.15 : 0.0;
-    let mult = 1.0 + tStats.bonusHpPercent + buffMult + (aktiveRune === "morgott" ? 1.0 : 0.0);
-    let finalMaxHp = Math.round((spielerMaxHp + runeHpBonus) * mult);
+    let tStats = berechneTalismanStats();
+    let finalMaxHp = berechneFinalMaxHp();
     let heilWert = Math.round(finalMaxHp * estusHeilProzent * (1 + tStats.bonusHealPercent));
     spielerHp = Math.min(finalMaxHp, spielerHp + heilWert); spielerFlasks--;
     if (window.ER) ER.flaskDrunk();
@@ -1754,10 +1791,7 @@ function spielerHeilen() {
 }
 
 function heileUndRegeneriereVoll(nurHp) {
-  let tStats = berechneTalismanStats(); let runeHpBonus = (aktiveRune === "godrick" ? Math.round(spielerMaxHp * 0.25) : 0) + (aktiveRune === "radahn" ? Math.round(spielerMaxHp * 0.5) : 0);
-  let buffMult = (activeDungeonBuff === "hp" && dungeonBuffRemainingCombats > 0) ? 0.15 : 0.0;
-  let mult = 1.0 + tStats.bonusHpPercent + buffMult + (aktiveRune === "morgott" ? 1.0 : 0.0);
-  spielerHp = Math.round((spielerMaxHp + runeHpBonus) * mult);
+  spielerHp = berechneFinalMaxHp();
   if (!nurHp) spielerFlasks = maxKlassenFlasks;
 }
 
@@ -1812,7 +1846,15 @@ function kampfGewonnen() {
   if (gegnerName === "Morgott, der Omenkönig") { hatMorgottRune = true; if (hardMode) maxTalismanSlots = Math.max(maxTalismanSlots, 3); aktuelleRegion = "Mountaintops"; aktuelleEbene = 1; geloesieKnotenIds = []; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("Mountaintops"); oeffneStatPopup(t("boss_morgott_title"), t("boss_morgott_win"), 1); return; }
   if (gegnerName === "Feuerriese") { maxWaffenSlots = hardMode ? 1 : 2; aktuelleRegion = "FarumAzula"; aktuelleEbene = 1; geloesieKnotenIds = []; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("FarumAzula"); oeffneStatPopup(t("boss_giant_title"), t("boss_giant_win"), 1); return; }
   if (gegnerName === "Maliketh, die Schwarze Klinge") { maxTalismanSlots = 4; aktuelleRegion = "AshenCapital"; aktuelleEbene = 1; geloesieKnotenIds = []; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("AshenCapital"); oeffneStatPopup(t("boss_maliketh_title"), t("boss_maliketh_win"), 1); return; }
-  if (gegnerName === "Gideon Ofnir, der Allwissende") { aktuelleRegion = "EldenThrone"; aktuelleEbene = 1; geloesieKnotenIds = []; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("EldenThrone"); oeffneStatPopup(t("boss_gideon_title"), t("boss_gideon_win"), 1); return; }
+  if (gegnerName === "Gideon Ofnir, der Allwissende") {
+    // Haligtree-Challenge: mit beiden Medaillonhälften fragen, ob man den Geheimpfad zu Malenia nimmt
+    if (activeChallenge === "haligtree" && medallionHalves >= 2) {
+      speichereRun();
+      oeffneMedallionChoicePopup();
+      return;
+    }
+    aktuelleRegion = "EldenThrone"; aktuelleEbene = 1; geloesieKnotenIds = []; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("EldenThrone"); oeffneStatPopup(t("boss_gideon_title"), t("boss_gideon_win"), 1); return;
+  }
   if (gegnerName === "Godfrey, der Erste Eldenlord") { oeffneStatPopup(t("boss_godfrey_title"), t("boss_godfrey_win"), naechsteEbene); return; }
   // Malenia Phase 2
   if (gegnerName === "Malenia, Blade of Miquella") {
@@ -1825,10 +1867,11 @@ function kampfGewonnen() {
     if (activeChallenge === "autobattle") setTimeout(autoBattleTick, 900);
     aktionsSperre = false; updateUI(); return;
   }
-  // Malenia Phase 2 besiegt = Haligtree Ending
+  // Malenia Phase 2 besiegt -> Bonus-Boss geschafft, zurück zum Eldenthron (kein Ende mehr)
   if (gegnerName === "Malenia, Goddess of Rot") {
-    if (window.ER) { ER.bossKilled("Malenia, Goddess of Rot"); ER.gameCompleted(); if (activeChallenge) ER.challengeCompleted(activeChallenge); }
-    oeffneAbschlussPopup(t("malenia_victory_title"), t("malenia_victory_desc")); return;
+    if (window.ER && activeChallenge === "haligtree") ER.challengeCompleted("haligtree");
+    aktuelleRegion = "EldenThrone"; aktuelleEbene = 1; geloesieKnotenIds = []; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("EldenThrone");
+    oeffneStatPopup(t("malenia_victory_title"), t("malenia_victory_desc"), 1); return;
   }
 
   if (gegnerName === "Eldenbiest") { oeffneAbschlussPopup(t("elden_lord_title"), t("boss_beast_win")); return; }
@@ -1870,6 +1913,18 @@ function berechneTalismanStats() {
   let stats = { bonusDmgPercent: 0.0, bonusHpPercent: 0.0, extraRolle: 0.0, bonusHealPercent: 0.0, bonusDmgTakenPercent: 0.0 };
   ausgeruesteteTalismane.forEach(t => { stats.bonusDmgPercent += (t.dmg || 0); stats.bonusHpPercent += (t.hp || 0); stats.extraRolle += (t.dodge || 0); stats.bonusHealPercent += (t.heal || 0); stats.bonusDmgTakenPercent += (t.dmgTaken || 0); });
   return stats;
+}
+
+// Einzige Quelle der Wahrheit für die maximale HP (Talismane + Runen + Dungeon-Buff).
+// Wird überall verwendet (UI, Heilen, Gnade, Boss-Refill, Auto-Heal), damit die Werte nie auseinanderlaufen.
+function berechneFinalMaxHp() {
+  let tStats = berechneTalismanStats();
+  let runeHpBonus = (aktiveRune === "godrick" ? Math.round(spielerMaxHp * 0.25) : 0)
+                  + (aktiveRune === "radahn"  ? Math.round(spielerMaxHp * 0.50) : 0);
+  let mult = 1.0 + tStats.bonusHpPercent
+           + ((activeDungeonBuff === "hp" && dungeonBuffRemainingCombats > 0) ? 0.15 : 0.0)
+           + (aktiveRune === "morgott" ? 1.0 : 0.0);
+  return Math.round((spielerMaxHp + runeHpBonus) * mult);
 }
 
 function oeffneTalismanPopup(naechsteEbene) {
@@ -1932,7 +1987,7 @@ function oeffneTalismanPopup(naechsteEbene) {
 function ersetzeTalismanSlot(index, talismanObj, naechsteEbene) { ausgeruesteteTalismane[index] = talismanObj; bestaetigeStufe(naechsteEbene); }
 
 function oeffneQuestRewardPopup(naechsteEbene) {
-  questProgress = 0; medallionHalves = 0; fortressPlacedRegions = []; let overlay = document.getElementById("popup-overlay"); let content = document.getElementById("popup-content");
+  questProgress = 0; medallionHalves = 0; fortressPlacedRegions = []; fortressRegionsPlan = null; let overlay = document.getElementById("popup-overlay"); let content = document.getElementById("popup-content");
   content.innerHTML = `
     <h3 style="color: #3498db; font-size:1.6rem; margin-top:0; letter-spacing:2px; font-family: 'Mantinia', serif;">${t("quest_title")}</h3>
     <p style="color:#aaa; font-size:0.95rem; margin-bottom:20px;">${t("quest_desc")}</p>
@@ -2092,8 +2147,9 @@ function updateChallengeBadge() {
 // Auto-Battle: Heal-Button auf der Karte (nur außerhalb des Kampfes)
 function mapHeal() {
   if (imKampf || spielerFlasks <= 0) return;
+  let finalMaxHp = berechneFinalMaxHp();
+  if (spielerHp >= finalMaxHp) return; // schon volle HP -> keinen Flakon verschwenden
   let tStats = berechneTalismanStats();
-  let finalMaxHp = Math.round(spielerMaxHp * (1 + tStats.bonusHpPercent));
   let heilWert = Math.round(finalMaxHp * estusHeilProzent * (1 + tStats.bonusHealPercent));
   spielerHp = Math.min(finalMaxHp, spielerHp + heilWert);
   spielerFlasks--;
@@ -2105,10 +2161,18 @@ function mapHeal() {
 function updateMapHealBtn() {
   let btn = document.getElementById("map-heal-btn");
   if (!btn) return;
-  if (activeChallenge === "autobattle" && !imKampf && spielerFlasks > 0 && spielerHp < spielerMaxHp) {
+  // Button ist im Auto-Battle dauerhaft sichtbar, solange man außerhalb eines Kampfes ist
+  // und noch Flakons hat. Bei voller HP bleibt er sichtbar, ist aber deaktiviert (Klick tut nichts).
+  if (activeChallenge === "autobattle" && !imKampf && spielerFlasks > 0) {
+    let voll = spielerHp >= berechneFinalMaxHp();
     btn.style.display = "block";
+    btn.disabled = voll;
+    btn.style.opacity = voll ? "0.45" : "1";
+    btn.style.cursor = voll ? "not-allowed" : "pointer";
     btn.innerText = "🧪 " + t("btn_heal") + " (" + spielerFlasks + ")";
-  } else { btn.style.display = "none"; }
+  } else {
+    btn.style.display = "none";
+  }
 }
 
 function bestaetigeStufe(naechsteEbene) { document.getElementById("popup-overlay").style.display = "none"; aktuelleEbene = naechsteEbene; speichereRun(); updateUI(); }
