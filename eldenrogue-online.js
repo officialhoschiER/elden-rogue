@@ -38,6 +38,10 @@
   }
 
   /* ====== 2) SPEICHER-HELFER ====== */
+  // Aktuelle Spielversion. Runs, die ab jetzt abgeschlossen werden, werden
+  // in der Bestenliste mit diesem Patch markiert. Bei neuem Patch hier hochzählen.
+  const GAME_PATCH = "1.4";
+
   const STATS_KEY = "eldenRogueStats";
   const RUN_KEY   = "eldenRogueRun";
   const ACH_KEY   = "eldenRogueAchievements";
@@ -55,7 +59,9 @@
     // --- NEU: Hard-Mode & Challenges ---
     hardCompleted: 0, challenges: {},
     // --- NEU: getrennte Hard-Mode-Bestenliste ---
-    bestScoreHard: 0, bestRunBossesHard: 0, furthestStageHard: 0
+    bestScoreHard: 0, bestRunBossesHard: 0, furthestStageHard: 0,
+    // --- NEU: Patch-Version, auf der die jeweilige Bestleistung erzielt wurde ---
+    bestScorePatch: "", bestScoreHardPatch: ""
   };
 
   function getStats() {
@@ -179,11 +185,14 @@
       var r = getRun();
       var mode = (r.mode === "hard") ? "hard" : "normal";
       var score = (r.stage || 0) * 1000 + (r.bosses || 0) * 200 + (r.fights || 0) * 10;
+      var prev = getStats();
       if (mode === "hard") {
+        if (score > (prev.bestScoreHard || 0)) { var sh = getStats(); sh.bestScoreHardPatch = GAME_PATCH; saveStats(sh); }
         setMax("bestScoreHard", score);
         setMax("bestRunBossesHard", r.bosses || 0);
         setMax("furthestStageHard", r.stage || 0);
       } else {
+        if (score > (prev.bestScore || 0)) { var sn = getStats(); sn.bestScorePatch = GAME_PATCH; saveStats(sn); }
         setMax("bestScore", score);
         setMax("bestRunBosses", r.bosses || 0);
       }
@@ -272,6 +281,7 @@
                 score: sc,
                 stage: mode === "hard" ? (x.furthestStageHard || 0) : (x.furthestStage || 0),
                 bosses: mode === "hard" ? (x.bestRunBossesHard || 0) : (x.bestRunBosses || 0),
+                patch: mode === "hard" ? (x.bestScoreHardPatch || "") : (x.bestScorePatch || ""),
                 photo: x.photoURL || ""
               });
             });
@@ -290,7 +300,9 @@
     var b = lsGet(BOARD_KEY, []);
     b = b.filter(function (x) { return (x.mode || "normal") === mode; });
     b.sort(function (a, c) { return c.score - a.score; });
-    return b.slice(0, limit);
+    return b.slice(0, limit).map(function (x) {
+      return { name: x.name, score: x.score, stage: x.stage, bosses: x.bosses, patch: x.patch || "", photo: x.photo || "" };
+    });
   }
   function submitToBoard(score, meta, mode) {
     if (score <= 0) return;
@@ -299,9 +311,10 @@
     var b = lsGet(BOARD_KEY, []);
     var mine = b.find(function (x) { return x.name === name && x.local && (x.mode || "normal") === mode; });
     if (mine) {
-      if (score > mine.score) { mine.score = score; mine.stage = meta.stage; mine.bosses = meta.bosses; }
+      // Nur bei neuer Bestleistung aktualisieren – Patch dann auf aktuellen Patch setzen
+      if (score > mine.score) { mine.score = score; mine.stage = meta.stage; mine.bosses = meta.bosses; mine.patch = GAME_PATCH; }
     } else {
-      b.push({ name: name, score: score, stage: meta.stage, bosses: meta.bosses, mode: mode, local: true });
+      b.push({ name: name, score: score, stage: meta.stage, bosses: meta.bosses, mode: mode, patch: GAME_PATCH, local: true });
     }
     lsSet(BOARD_KEY, b);
     cloudPush();
@@ -323,6 +336,9 @@
       bestScoreHard: s.bestScoreHard || 0,
       bestRunBossesHard: s.bestRunBossesHard || 0,
       furthestStageHard: s.furthestStageHard || 0,
+      // NEU: Patch, auf dem die jeweilige Bestleistung erzielt wurde
+      bestScorePatch: s.bestScorePatch || "",
+      bestScoreHardPatch: s.bestScoreHardPatch || "",
       updatedAt: (firebase.firestore && firebase.firestore.FieldValue ? firebase.firestore.FieldValue.serverTimestamp() : Date.now())
     };
     try { fbDB.collection("users").doc(currentUser.uid).set(doc, { merge: true }); } catch (e) { console.warn("[ER] cloudPush:", e); }
