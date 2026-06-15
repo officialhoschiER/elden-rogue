@@ -624,10 +624,25 @@ function t(key, placeholders) {
 }
 function talismanNameLoc(name) {
   if (!window.i18n) return name;
-  let key = "tal_" + name.toLowerCase().replace(/[^a-zäöü0-9]/g, "_");
+  // Tier-Suffix (" +1", " +2" ...) abtrennen, Basis übersetzen, Suffix wieder anhängen
+  let m = String(name).match(/^(.*?)(\s*\+\d+)?$/);
+  let base = m ? m[1] : name;
+  let suffix = (m && m[2]) ? m[2] : "";
+  let key = "tal_" + base.toLowerCase().replace(/[^a-zäöü0-9]/g, "_");
+  let v = window.i18n.t(key);
+  return ((v && v !== key) ? v : base) + suffix;
+}
+// Lokalisiert Gegner-/Bossnamen (intern bleiben die deutschen Namen als Schlüssel)
+function gegnerNameLoc(name) {
+  if (!window.i18n || !name) return name;
+  let key = "npc_" + String(name).toLowerCase().replace(/[^a-z0-9äöüß]/g, "_");
   let v = window.i18n.t(key);
   return (v && v !== key) ? v : name;
 }
+// Lokalisiert einen einzelnen Schadenstyp ("Magie" -> "Magic")
+function dmgArtLoc(art) { return window.i18n ? t("dmg_" + String(art).toLowerCase()) : art; }
+// Lokalisiert eine Liste von Schadenstypen und fügt sie zusammen
+function dmgArtenLoc(arr, sep) { return (arr || []).map(dmgArtLoc).join(sep || " / "); }
 function affLabel(a){ return a === "Blut" ? t("affinity_blood") : a === "Eis" ? t("affinity_ice") : a === "Blut & Eis" ? t("affinity_both") : t("affinity_none"); }
 
 function renderStaticTextGame() {
@@ -725,7 +740,7 @@ const schadensartIcons = { Normal: "images/dmg_normal.png", Magie: "images/dmg_m
 const schadensartFarben = { Normal: "#cccccc", Magie: "#4aa3ff", Feuer: "#e67e22", Heilig: "#f1c40f" };
 function dmgTypIconHtml(art) {
   let datei = schadensartIcons[art] || ""; let farbe = schadensartFarben[art] || "#ccc";
-  return `<span class="dmg-type-icon tip" data-tooltip=t("combat_dmg_type") + ": " + t("dmg_" + art.toLowerCase())><img src="${datei}" alt="${art}" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';"><span class="dmg-fallback" style="display:none; color:${farbe};">${art.slice(0,2)}</span></span>`;
+  return `<span class="dmg-type-icon tip" data-tooltip="${t("combat_dmg_type")}: ${dmgArtLoc(art)}"><img src="${datei}" alt="${dmgArtLoc(art)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';"><span class="dmg-fallback" style="display:none; color:${farbe};">${dmgArtLoc(art).slice(0,2)}</span></span>`;
 }
 
 function rolleZufallsWaffe() {
@@ -1319,7 +1334,7 @@ function updateUI() {
       gelagerteWaffen.forEach((w, i) => {
         let f = raritaetFarben[w.rarity] || "#9aa0a6"; let d = document.createElement("div");
         d.style.cssText = `background:rgba(0,0,0,0.4); border:1px solid ${f}; border-radius:3px; padding:4px 6px; font-size:0.78rem; font-family:sans-serif; text-transform:none; display:flex; justify-content:space-between; align-items:center;`;
-        d.innerHTML = `<span style="color:${f}; font-weight:bold;">${waffenNameLoc(w.name)}</span><span style="color:#888;">${w.schadensarten.join("/")}</span>`;
+        d.innerHTML = `<span style="color:${f}; font-weight:bold;">${waffenNameLoc(w.name)}</span><span style="color:#888;">${dmgArtenLoc(w.schadensarten, "/")}</span>`;
         if (!imKampf) { d.style.cursor = "pointer"; d.title = t("storage_swap_tip"); d.onclick = () => wechsleWaffe(i); } else { d.style.opacity = "0.5"; }
         wCont.appendChild(d);
       });
@@ -1374,7 +1389,7 @@ function updateUI() {
     document.getElementById("arena-player-hp-text").innerText = `${spielerHp} / ${finalMaxHp}`;
     document.getElementById("enemy-hp-bar").max = gegnerMaxHp; document.getElementById("enemy-hp-bar").value = gegnerHp;
     document.getElementById("arena-enemy-hp-text").innerText = `${gegnerHp} / ${gegnerMaxHp}`;
-    document.getElementById("arena-enemy-name").innerText = gegnerName; 
+    document.getElementById("arena-enemy-name").innerText = gegnerNameLoc(gegnerName); 
     
     document.getElementById("enemy-stagger-badge").style.display = (enemyIsStaggered || staggerVisualActive) ? "block" : "none";
     document.getElementById("enemy-sprite-wrapper").classList.toggle("staggered", enemyIsStaggered || staggerVisualActive);
@@ -1497,7 +1512,7 @@ function klickeKnoten(ebene, knoten) {
       }
     }
   }
-  gegnerHp = gegnerMaxHp; imKampf = true; aktionsSperre = false; document.getElementById("battle-log").innerText = t("log_start") + gegnerName + "!"; updateUI();
+  gegnerHp = gegnerMaxHp; imKampf = true; aktionsSperre = false; document.getElementById("battle-log").innerText = t("log_start") + gegnerNameLoc(gegnerName) + "!"; updateUI();
 }
 
 function oeffneDungeonEintrittPopup() {
@@ -1572,25 +1587,37 @@ function triggerDungeonRun(naechsteEbene) {
   overlay.style.display = "flex";
 }
 
+// Liefert nur den Wirkungs-Teil eines Runen-Tooltips (Text nach dem ersten Zeilenumbruch)
+function runeEffektText(key) {
+  let tip = t("rune_" + key + "_tip");
+  let idx = tip.indexOf("\n");
+  return idx >= 0 ? tip.slice(idx + 1).replace(/\n/g, " ") : tip;
+}
+// Baut eine einzelne Runen-Option fürs Turm-Menü inkl. Name + Wirkung
+function towerRuneOptionHtml(key, hat, cssClass) {
+  let aktiv = aktiveRune === key;
+  let label = aktiv
+    ? ` <span style="color:#2ecc71;">${t("rune_active_label")}</span>`
+    : (!hat ? ` <span style="color:#888; font-size:0.8rem;">${t("rune_locked_label")}</span>` : "");
+  return `<div class="${cssClass}" onclick="${hat ? "waehleTurmRune('" + key + "')" : ""}">
+        <strong>${t("rune_" + key + "_name")}</strong>${label}
+        <div style="font-size:0.82rem; color:#bbb; margin-top:5px; font-family:sans-serif;">${runeEffektText(key)}</div>
+      </div>`;
+}
+
 function oeffneTowerSelectionMenu(naechsteEbene) {
   let overlay = document.getElementById("popup-overlay"); let content = document.getElementById("popup-content");
   let godrickClass = hatGodrickRune ? "tower-rune-option unlocked" : "tower-rune-option"; if (aktiveRune === "godrick") godrickClass += " active";
   let radahnClass = hatRadahnRune ? "tower-rune-option unlocked" : "tower-rune-option"; if (aktiveRune === "radahn") radahnClass += " active";
   let morgottClass = hatMorgottRune ? "tower-rune-option unlocked" : "tower-rune-option"; if (aktiveRune === "morgott") morgottClass += " active";
-  
+
   content.innerHTML = `
     <h3 style="color: var(--gold); font-size:1.6rem; margin-top:0; letter-spacing:2px; font-family: 'Mantinia', serif;">${t("tower_title")}</h3>
     <p style="color:#aaa; font-size:0.9rem; margin-bottom:20px;">${t("tower_desc")}</p>
     <div class="tower-selection-container">
-      <div class="${godrickClass}" onclick="${hatGodrickRune ? "waehleTurmRune('godrick')" : ""}">
-        <strong>Godricks Große Rune</strong> ${aktiveRune==='godrick'?'[AKTIV]':''}
-      </div>
-      <div class="${radahnClass}" onclick="${hatRadahnRune ? "waehleTurmRune('radahn')" : ""}">
-        <strong>Radahns Große Rune</strong> ${aktiveRune==='radahn'?'[AKTIV]':''}
-      </div>
-      <div class="${morgottClass}" onclick="${hatMorgottRune ? "waehleTurmRune('morgott')" : ""}">
-        <strong>Morgotts Große Rune</strong> ${aktiveRune==='morgott'?'[AKTIV]':''}
-      </div>
+      ${towerRuneOptionHtml("godrick", hatGodrickRune, godrickClass)}
+      ${towerRuneOptionHtml("radahn", hatRadahnRune, radahnClass)}
+      ${towerRuneOptionHtml("morgott", hatMorgottRune, morgottClass)}
     </div>
     <button class="btn-modal-action" onclick="bestaetigeStufe(${naechsteEbene})">${t("tower_leave")}</button>`;
   overlay.style.display = "flex";
@@ -1645,7 +1672,6 @@ function spielerAngriff() {
   }
 
   let schaden = finalDmg + Math.floor(Math.random() * 5) - 2;
-  schaden = 9999; // ⚠️ TEST-OVERRIDE: Diese eine Zeile vor dem Release entfernen!
   gegnerHp = Math.max(0, gegnerHp - schaden);
 
   if (gegnerHp > 0) {
@@ -1683,7 +1709,7 @@ function spielerAngriff() {
       else {
         let gSchaden = gegnerSchaden + Math.floor(Math.random() * 4) - 1; gSchaden = Math.round(gSchaden * (1 + tStats.bonusDmgTakenPercent) * (1 - ruestungReduktion)); gSchaden = Math.max(1, gSchaden);
         spielerHp = Math.max(0, spielerHp - gSchaden); playerWrapper.classList.add("enemy-hurt"); zeigeFloatingZahl(playerWrapper, "-" + gSchaden, "dmg-enemy");
-        document.getElementById("battle-log").innerText += t("roll_fail", { name: gegnerName, dmg: gSchaden }); updateUI();
+        document.getElementById("battle-log").innerText += t("roll_fail", { name: gegnerNameLoc(gegnerName), dmg: gSchaden }); updateUI();
       }
     }, 150);
     setTimeout(() => { playerWrapper.classList.remove("enemy-hurt"); playerWrapper.classList.remove("player-rolling"); if (spielerHp <= 0) { document.getElementById("battle-log").innerText = t("log_death"); zeigeTodesBildschirm(); } aktionsSperre = false; updateUI(); }, 450);
@@ -1720,7 +1746,7 @@ function spielerHeilen() {
       else {
         let gSchaden = gegnerSchaden + Math.floor(Math.random() * 3); gSchaden = Math.round(gSchaden * (1 + tStats.bonusDmgTakenPercent) * (1 - ruestungReduktion));
         gSchaden = Math.max(1, gSchaden); spielerHp = Math.max(0, spielerHp - gSchaden);
-        playerWrapper.classList.add("enemy-hurt"); zeigeFloatingZahl(playerWrapper, "-" + gSchaden, "dmg-enemy"); document.getElementById("battle-log").innerText += t("heal_roll_fail", { name: gegnerName, dmg: gSchaden }); updateUI();
+        playerWrapper.classList.add("enemy-hurt"); zeigeFloatingZahl(playerWrapper, "-" + gSchaden, "dmg-enemy"); document.getElementById("battle-log").innerText += t("heal_roll_fail", { name: gegnerNameLoc(gegnerName), dmg: gSchaden }); updateUI();
       }
       setTimeout(() => { playerWrapper.classList.remove("enemy-hurt"); playerWrapper.classList.remove("player-rolling"); if (spielerHp <= 0) { document.getElementById("battle-log").innerText = t("log_death"); zeigeTodesBildschirm(); } aktionsSperre = false; updateUI(); }, 450);
     }, 400);
@@ -1792,7 +1818,7 @@ function kampfGewonnen() {
   if (gegnerName === "Malenia, Blade of Miquella") {
     document.getElementById("battle-log").innerText = t("malenia_phase2_transition");
     gegnerName = "Malenia, Goddess of Rot"; gegnerMaxHp = Math.round(gegnerMaxHp * 1.3); gegnerHp = gegnerMaxHp; gegnerSchaden = Math.round(gegnerSchaden * 1.4);
-    document.getElementById("enemy-name").innerText = gegnerName;
+    document.getElementById("enemy-name").innerText = gegnerNameLoc(gegnerName);
     document.getElementById("enemy-img").src = "images/malenia-2nd-phase-flying.avif";
     document.getElementById("battle-enemy-hp").max = gegnerMaxHp; document.getElementById("battle-enemy-hp").value = gegnerHp;
     document.getElementById("arena-enemy-hp-text").innerText = gegnerHp + " / " + gegnerMaxHp;
@@ -1879,13 +1905,24 @@ function oeffneTalismanPopup(naechsteEbene) {
       <button class="btn-modal-action" onclick="bestaetigeStufe(${naechsteEbene})">${istVerflucht ? t("talisman_btn_curse") : t("talisman_btn_bind")}</button>
     `;
   } else {
-    let slotBtns = ausgeruesteteTalismane.map((t, i) => `<div class="tower-rune-option unlocked" onclick="ersetzeTalismanSlot(${i}, ${tJson}, ${naechsteEbene})"><strong>${window.i18n ? window.i18n.t("talisman_replace_slot",{i:i+1}) : ("Ersetze Slot "+(i+1)+":")}</strong> ${t.name}</div>`).join("");
+    // Ausgerüstete Talismane als ersetzbare Slots – mit Bild + lokalisiertem Namen (uebersichtlicher)
+    let slotBtns = ausgeruesteteTalismane.map((tal, i) => {
+      let tFarbe = tal.rarity === "cursed" ? "#c0392b" : (raritaetFarben[tal.rarity] || "#9aa0a6");
+      let bildHtml = tal.bild
+        ? `<img src="${tal.bild}" alt="" style="width:40px;height:40px;flex-shrink:0;object-fit:contain;border:1px solid ${tFarbe};border-radius:5px;background:rgba(0,0,0,0.5);" onerror="this.replaceWith(document.createTextNode('💍'))">`
+        : `<span style="font-size:1.6rem;flex-shrink:0;">💍</span>`;
+      let slotLabel = window.i18n ? window.i18n.t("talisman_replace_slot", { i: i + 1 }) : ("Ersetze Slot " + (i + 1) + ":");
+      return `<div class="tower-rune-option unlocked" style="display:flex;align-items:center;gap:12px;text-align:left;" onclick="ersetzeTalismanSlot(${i}, ${tJson}, ${naechsteEbene})">
+        ${bildHtml}
+        <div><strong>${slotLabel}</strong><br><span style="color:${tFarbe};">${talismanNameLoc(tal.name)}</span></div>
+      </div>`;
+    }).join("");
     let wegwerfenBtn = istVerflucht ? "" : `<div class="tower-rune-option unlocked" style="border-color: #e74c3c; background-color: #2b1111;" onclick="bestaetigeStufe(${naechsteEbene})"><strong style="color: #e74c3c;">${t("talisman_discard_new")}</strong></div>`;
     content.innerHTML = `
-      <h3 style="color: #ede6d4; font-size:1.5rem; margin-top:0; letter-spacing:1px; font-family: 'Mantinia', serif;">${istVerflucht ? "☠️ Verfluchter Talisman!" : "💍 Inventar voll!"}</h3>
-      <p style="color:#aaa; font-size:0.95rem;">Du hast folgenden Talisman gefunden:</p>
+      <h3 style="color: #ede6d4; font-size:1.5rem; margin-top:0; letter-spacing:1px; font-family: 'Mantinia', serif;">${istVerflucht ? t("talisman_cursed_title") : t("talisman_inventory_full_title")}</h3>
+      <p style="color:#aaa; font-size:0.95rem;">${t("talisman_you_found")}</p>
       ${infoBox}
-      <p style="color:#cda34f; font-size:0.9rem; font-weight:bold;">${istVerflucht ? "Du musst ihn ausrüsten – wähle, welchen Slot er ersetzt:" : "Wähle einen Slot zum Ersetzen oder wirf den neuen weg:"}</p>
+      <p style="color:#cda34f; font-size:0.9rem; font-weight:bold;">${istVerflucht ? t("talisman_must_equip_choose") : t("talisman_choose_replace_or_discard")}</p>
       <div class="tower-selection-container" style="margin: 15px 0;">${slotBtns}${wegwerfenBtn}</div>
     `;
   }
@@ -1942,7 +1979,7 @@ function oeffneWaffenFundPopup(waffe, naechsteEbene) {
     <div style="background-color:#111; border:1px solid ${f}; padding:18px; border-radius:4px; margin:15px 0;">
       <h4 style="color:${f}; margin:0 0 4px 0; font-size:1.2rem; font-family: 'Mantinia', serif;">${waffenNameLoc(waffe.name)}</h4>
       <div style="font-size:0.8rem; color:${f}; font-family: sans-serif; text-transform:uppercase; letter-spacing:1px;">${label}</div>
-      <div style="font-size:0.9rem; color:#eee; margin-top:8px; font-family: sans-serif;">${t("loot_dmg")} <strong>${waffe.basisDmg}</strong> &nbsp;·&nbsp; ${t("loot_type")} <strong>${waffe.schadensarten.join(" / ")}</strong></div>
+      <div style="font-size:0.9rem; color:#eee; margin-top:8px; font-family: sans-serif;">${t("loot_dmg")} <strong>${waffe.basisDmg}</strong> &nbsp;·&nbsp; ${t("loot_type")} <strong>${dmgArtenLoc(waffe.schadensarten, " / ")}</strong></div>
       <div style="font-size:0.78rem; color:#888; margin-top:6px; font-family: sans-serif;">${t("loot_current", { name: waffenNameLoc(waffenName), dmg: waffenSchaden })}</div>
     </div>
     <p style="font-size:0.78rem; color:#999; font-family: sans-serif;">${t("loot_hint")}</p>
