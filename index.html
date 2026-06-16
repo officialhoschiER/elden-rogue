@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Elden Rogue - Hauptmenü</title>
-  <link rel="icon" type="image/png" href="images/flavicon.png">
+  <link rel="icon" type="image/png" href="images/icons/flavicon.png">
   
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -21,7 +21,7 @@
       background-color: var(--bg-dark); color: #ede6d4; font-family: 'Georgia', serif;
       min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
       background-image: linear-gradient(to bottom, rgba(5,5,5,0.7), rgba(5,5,5,0.92) 60%, rgba(5,5,5,1)),
-                         url('images/limgrave.jpg');
+                         url('images/background/limgrave.jpg');
       background-size: cover; background-position: center top; background-attachment: fixed;
     }
 
@@ -356,6 +356,14 @@
     document.getElementById("ch-noarmor-desc").innerText = t("challenge_noarmor_desc");
     document.getElementById("ch-noarmor-btn-n").innerText = t("lb_mode_normal");
     document.getElementById("ch-noarmor-btn-h").innerText = t("lb_mode_hard");
+    document.getElementById("ch-tower-name").innerText = t("challenge_tower");
+    document.getElementById("ch-tower-desc").innerText = t("challenge_tower_desc");
+    document.getElementById("ch-noblaidd-name").innerText = t("challenge_noblaidd");
+    document.getElementById("ch-noblaidd-desc").innerText = t("challenge_noblaidd_desc");
+    document.getElementById("ch-auto-name").innerText = t("challenge_autobattle");
+    document.getElementById("ch-auto-desc").innerText = t("challenge_autobattle_desc");
+    document.getElementById("ch-haligtree-name").innerText = t("challenge_haligtree");
+    document.getElementById("ch-haligtree-desc").innerText = t("challenge_haligtree_desc");
     document.getElementById("ch-footer").innerText = lang === 'en' ? "More challenges coming soon…" : "Weitere Challenges kommen bald…";
     document.getElementById("btn-ch-text").innerText = t("challenge_title");
     // Continue button
