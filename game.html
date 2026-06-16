@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Elden Rogue - Spielbereich</title>
-  <link rel="icon" type="image/png" href="images/flavicon.png">
+  <link rel="icon" type="image/png" href="images/icons/flavicon.png">
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -387,7 +387,7 @@ h1, h2, h3, .btn-menu, .btn-combat, .btn-social, .game-author-tag, #region-displ
           <progress id="player-hp-bar" class="player-progress" value="100" max="100"></progress>
         </div>
         <div class="estus-display tip" id="estus-display" data-tooltip="Estus Flask">
-          <img id="estus-img" src="images/icon_estus.png" alt="Estus" onerror="this.style.display='none'">
+          <img id="estus-img" src="images/icons/icon_estus.png" alt="Estus" onerror="this.style.display='none'">
           <span class="estus-count" id="estus-count">3</span>
         </div>
         <div class="dodge-pill" id="player-dodge-text">Rolle <b>30%</b></div>
@@ -429,8 +429,8 @@ h1, h2, h3, .btn-menu, .btn-combat, .btn-social, .game-author-tag, #region-displ
       <div id="medallion-display" style="display:none; margin-top:6px; border-top:1px solid #2a2a2a; padding-top:5px;">
         <div style="font-size:0.65rem; color:#888; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:3px;">Haligtree Medallion</div>
         <div style="display:flex; gap:8px; justify-content:center;">
-          <img id="medal-left" src="images/ER_Icon_Key_Item_Haligtree_Secret_Medallion_29.webp" style="width:32px;height:32px;opacity:0.15;" onerror="this.style.display='none'">
-          <img id="medal-right" src="images/ER_Icon_Key_Item_Haligtree_Secret_Medallion_(Right).webp" style="width:32px;height:32px;opacity:0.15;" onerror="this.style.display='none'">
+          <img id="medal-left" src="images/icons/ER_Icon_Key_Item_Haligtree_Secret_Medallion_29.webp" style="width:32px;height:32px;opacity:0.15;" onerror="this.style.display='none'">
+          <img id="medal-right" src="images/icons/ER_Icon_Key_Item_Haligtree_Secret_Medallion_(Right).webp" style="width:32px;height:32px;opacity:0.15;" onerror="this.style.display='none'">
         </div>
       </div>
       <div style="margin-top:6px; border-top:1px solid #2a2a2a; padding-top:5px; font-size:0.72rem; color:#3498db; font-weight:bold;" id="quest-progress-text">Blaidd: 0 / 4</div>
@@ -447,13 +447,13 @@ h1, h2, h3, .btn-menu, .btn-combat, .btn-social, .game-author-tag, #region-displ
       <div id="ui-runes-title" style="font-size: 0.72rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-top:8px;">Große Runen</div>
       <div class="mini-runen-container">
         <div id="mini-rune-godrick" class="mini-rune-slot" data-tooltip="Godricks Rune:\n+25% max. HP, +10 DMG und +15% Ausweichen">
-          <div class="mini-rune-preview-box"><img src="images/rune_godrick.jpg" alt="G" onerror="this.style.opacity=0.4"></div>
+          <div class="mini-rune-preview-box"><img src="images/icons/rune_godrick.jpg" alt="G" onerror="this.style.opacity=0.4"></div>
         </div>
         <div id="mini-rune-radahn" class="mini-rune-slot" data-tooltip="Radahns Rune:\n+50% max. HP und +20 DMG">
-          <div class="mini-rune-preview-box"><img src="images/rune_radahn.png" alt="R" onerror="this.style.opacity=0.4"></div>
+          <div class="mini-rune-preview-box"><img src="images/icons/rune_radahn.png" alt="R" onerror="this.style.opacity=0.4"></div>
         </div>
         <div id="mini-rune-morgott" class="mini-rune-slot" data-tooltip="Morgotts Rune:\nVerdoppelt dein maximales Leben (x2 HP)">
-          <div class="mini-rune-preview-box"><img src="images/rune_morgott.webp" alt="M" onerror="this.style.opacity=0.4"></div>
+          <div class="mini-rune-preview-box"><img src="images/icons/rune_morgott.webp" alt="M" onerror="this.style.opacity=0.4"></div>
         </div>
       </div>
     </div>
@@ -495,7 +495,7 @@ h1, h2, h3, .btn-menu, .btn-combat, .btn-social, .game-author-tag, #region-displ
             <span id="arena-player-hp-text" class="bar-text-overlay">100 / 100</span>
           </div>
           <div class="combat-sprite-frame">
-            <img id="player-combat-img" src="images/tarnished_idle.png" alt="Tarnished">
+            <img id="player-combat-img" src="images/starter/tarnished_idle.png" alt="Tarnished">
           </div>
         </div>
 
@@ -574,7 +574,7 @@ let besiegteWaechter = 0;
 let ruestungName = "Keine"; let ruestungRaritaet = "common"; let ruestungReduktion = 0; let ruestungBild = "";
 let ausgeruesteteTalismane = []; let maxTalismanSlots = hardMode ? 2 : 3; let hatGodrickRune = false; let hatRadahnRune = false; let hatMorgottRune = false; let aktiveRune = "keine";
 let imKampf = false; let gegnerName = ""; let gegnerHp = 0; let gegnerMaxHp = 0; let gegnerSchaden = 0; let aktuellerKnotenTyp = 0;
-let questProgress = 0; let playerImageStr = "images/tarnished_idle.png";
+let questProgress = 0; let playerImageStr = "images/starter/tarnished_idle.png";
 let medallionHalves = 0; // 0, 1, 2 — Haligtree-Challenge
 
 let playerHitsOnEnemy = 0;
@@ -762,7 +762,7 @@ const waffenBilder = {
 function gibWaffenBild(name) { return waffenBilder[name] || platzhalterWaffenBild; }
 function waffenNameLoc(name) { if (!window.i18n) return name; let k = "weapon_" + name.toLowerCase().replace(/[^a-zäöüß]/g,"_"); let v = window.i18n.t(k); return (v !== k) ? v : name; }
 
-const schadensartIcons = { Normal: "images/dmg_normal.png", Magie: "images/dmg_magie.png", Feuer: "images/dmg_feuer.png", Heilig: "images/dmg_heilig.png" };
+const schadensartIcons = { Normal: "images/weapons/dmg_normal.png", Magie: "images/weapons/dmg_magie.png", Feuer: "images/weapons/dmg_feuer.png", Heilig: "images/weapons/dmg_heilig.png" };
 const schadensartFarben = { Normal: "#cccccc", Magie: "#4aa3ff", Feuer: "#e67e22", Heilig: "#f1c40f" };
 function dmgTypIconHtml(art) {
   let datei = schadensartIcons[art] || ""; let farbe = schadensartFarben[art] || "#ccc";
@@ -893,52 +893,52 @@ function gibAusgeruesteteRuestung(){ return { name:ruestungName, rarity:ruestung
 function hatRuestungAusgeruestet(){ return ruestungReduktion > 0 || ruestungName !== t("no_armor"); }
 
 const minibosseProStage = {
-  1: { name:"Beastman of Farum Azula", bild:"images/miniboss_beastman.jpg" },
-  2: { name:"Cleanrot Knight", bild:"images/miniboss_cleanrot_knight.png" },
-  3: { name:"Omenkiller & Miranda the Blighted Bloom", bild:"images/miniboss_omenkiller.jpg" },
-  4: { name:"Erdtree Avatar", bild:"images/miniboss_erdtree_avatar.webp" },
+  1: { name:"Beastman of Farum Azula", bild:"images/Gegner/miniboss_beastman.jpg" },
+  2: { name:"Cleanrot Knight", bild:"images/Gegner/miniboss_cleanrot_knight.png" },
+  3: { name:"Omenkiller & Miranda the Blighted Bloom", bild:"images/Gegner/miniboss_omenkiller.jpg" },
+  4: { name:"Erdtree Avatar", bild:"images/Gegner/miniboss_erdtree_avatar.webp" },
   5: { name:"Stray Mimic Tear", bild:"__TARNISHED__" }, 
-  6: { name:"Dragonkin Soldier", bild:"images/miniboss_dragonkin_soldier.png" },
-  8: { name: "Putrid Tree Spirit", hp: 380, dmg: 65, bild: "images/putrid_tree_spirit.webp" }
+  6: { name:"Dragonkin Soldier", bild:"images/Gegner/miniboss_dragonkin_soldier.png" },
+  8: { name: "Putrid Tree Spirit", hp: 380, dmg: 65, bild: "images/Gegner/putrid_tree_spirit.webp" }
 };
 function gibAktuellenMiniboss(){ return minibosseProStage[gibStageNummer()] || minibosseProStage[6]; }
 
 const gebietsGegnerKonfig = {
   Haligtree: {
-    elite: "images/haligtree_knight.webp", waechter: "images/putrid_avatar.webp", invader: "images/millicent.webp",
+    elite: "images/Gegner/haligtree_knight.webp", waechter: "images/Gegner/putrid_avatar.webp", invader: "images/Gegner/millicent.webp",
     waechterName: "Putrid Avatar", eliteName: "Haligtree Knight", invaderName: "Millicent",
     gegnerBasis: { elite: { hp: 220, dmg: 55 }, waechter: { hp: 300, dmg: 50 }, invader: { hp: 250, dmg: 60 }, skelett: { hp: 80, dmg: 25 } }
   },
-  Limgrave: { elite: "images/soldat.jpg", waechter: "images/LIMGRAVE_WAECHTER.webp", invader: "images/LIMGRAVE_INVADER.webp", eliteName: "Elite-Ritter", waechterName: "Bloodhound Knight", invaderName: "Nerijus" },
-  Caelid: { elite: "images/CAELID_ELITE.jpg", waechter: "images/CAELID_WAECHTER.webp", invader: "images/CAELID_INVADER.jpg", eliteName: "Böser Vogel", waechterName: "Ekzykes", invaderName: "Vyke" },
-  Leyndell: { elite: "images/LEYNDELL_ELITE.jpg", waechter: "images/LEYNDELL_WAECHTER.jpg", invader: "images/LEYNDELL_INVADER.jpg", eliteName: "Leyndell Ritter", waechterName: "Omen", invaderName: "Eleonora" },
-  Mountaintops: { elite: "images/MOUNTAINTOPS_ELITE.jpg", waechter: "images/MOUNTAINTOPS_WAECHTER.jpg", invader: "images/MOUNTAINTOPS_INVADER.jpg", eliteName: "Feuermönch", waechterName: "Troll", invaderName: "Okina" },
-  FarumAzula: { elite: "images/FARUMAZULA_ELITE.jpg", waechter: "images/FARUMAZULA_WAECHTER.jpg", invader: "images/FARUMAZULA_INVADER.jpg", eliteName: "Bestienmensch of Farum Azula", waechterName: "Farum Azula Drache", invaderName: "Anastasia" },
-  AshenCapital: { elite: "images/ASHENCAPITAL_ELITE.jpg", waechter: "images/ASHENCAPITAL_WAECHTER.jpg", invader: "images/ASHENCAPITAL_INVADER.jpg", eliteName: "Page", waechterName: "Königlicher Revenant", invaderName: "Varre" }
+  Limgrave: { elite: "images/Gegner/soldat.jpg", waechter: "images/Gegner/LIMGRAVE_WAECHTER.webp", invader: "images/Gegner/LIMGRAVE_INVADER.webp", eliteName: "Elite-Ritter", waechterName: "Bloodhound Knight", invaderName: "Nerijus" },
+  Caelid: { elite: "images/Gegner/CAELID_ELITE.jpg", waechter: "images/Gegner/CAELID_WAECHTER.webp", invader: "images/Gegner/CAELID_INVADER.jpg", eliteName: "Böser Vogel", waechterName: "Ekzykes", invaderName: "Vyke" },
+  Leyndell: { elite: "images/Gegner/LEYNDELL_ELITE.jpg", waechter: "images/Gegner/LEYNDELL_WAECHTER.jpg", invader: "images/Gegner/LEYNDELL_INVADER.jpg", eliteName: "Leyndell Ritter", waechterName: "Omen", invaderName: "Eleonora" },
+  Mountaintops: { elite: "images/Gegner/MOUNTAINTOPS_ELITE.jpg", waechter: "images/Gegner/MOUNTAINTOPS_WAECHTER.jpg", invader: "images/Gegner/MOUNTAINTOPS_INVADER.jpg", eliteName: "Feuermönch", waechterName: "Troll", invaderName: "Okina" },
+  FarumAzula: { elite: "images/Gegner/FARUMAZULA_ELITE.jpg", waechter: "images/Gegner/FARUMAZULA_WAECHTER.jpg", invader: "images/Gegner/FARUMAZULA_INVADER.jpg", eliteName: "Bestienmensch of Farum Azula", waechterName: "Farum Azula Drache", invaderName: "Anastasia" },
+  AshenCapital: { elite: "images/Gegner/ASHENCAPITAL_ELITE.jpg", waechter: "images/Gegner/ASHENCAPITAL_WAECHTER.jpg", invader: "images/Gegner/ASHENCAPITAL_INVADER.jpg", eliteName: "Page", waechterName: "Königlicher Revenant", invaderName: "Varre" }
 };
 
 const bilderDatenbankBosse = {
-  "Loretta, Knight of the Haligtree": "images/loretta-knight-of-haligtree.jpg",
-  "Commander Niall": "images/commander-niall-elden-ring-wiki.jpg",
-  "Malenia, Blade of Miquella": "images/maleniap1.webp",
-  "Malenia, Goddess of Rot": "images/malenia-2nd-phase-flying.avif",
-  "Loretta, Knight of the Haligtree": "images/loretta-knight-of-haligtree.jpg",
-  "Commander Niall": "images/commander-niall-elden-ring-wiki.jpg",
-  "Blaidd, der Halbwolf": "images/blaidd.avif",
-  "Godrick, der Verpflanzte": "images/godrick.webp", "Sternengeißel Radahn": "images/radahn.webp", "Morgott, der Omenkönig": "images/Morgott.webp",
-  "Feuerriese": "images/firegiant.avif", "Maliketh, die Schwarze Klinge": "images/maliketh.jpg",
-  "Gideon Ofnir, der Allwissende": "images/gideon.webp", "Godfrey, der Erste Eldenlord": "images/godfrey.webp",
-  "Radagon von der Goldenen Ordnung": "images/radagon.jpg", "Eldenbiest": "images/eldenbeast.jpg",
-  "Dungeon Skelett": "images/skeleton.webp", "Cemetery Shade": "images/catacomb_boss.jpg"
+  "Loretta, Knight of the Haligtree": "images/bosse/loretta-knight-of-haligtree.jpg",
+  "Commander Niall": "images/bosse/commander-niall-elden-ring-wiki.jpg",
+  "Malenia, Blade of Miquella": "images/bosse/maleniap1.webp",
+  "Malenia, Goddess of Rot": "images/bosse/malenia-2nd-phase-flying.avif",
+  "Loretta, Knight of the Haligtree": "images/bosse/loretta-knight-of-haligtree.jpg",
+  "Commander Niall": "images/bosse/commander-niall-elden-ring-wiki.jpg",
+  "Blaidd, der Halbwolf": "images/Gegner/blaidd.avif",
+  "Godrick, der Verpflanzte": "images/bosse/godrick.webp", "Sternengeißel Radahn": "images/bosse/radahn.webp", "Morgott, der Omenkönig": "images/bosse/Morgott.webp",
+  "Feuerriese": "images/bosse/firegiant.avif", "Maliketh, die Schwarze Klinge": "images/bosse/maliketh.jpg",
+  "Gideon Ofnir, der Allwissende": "images/bosse/gideon.webp", "Godfrey, der Erste Eldenlord": "images/bosse/godfrey.webp",
+  "Radagon von der Goldenen Ordnung": "images/bosse/radagon.jpg", "Eldenbiest": "images/bosse/eldenbeast.jpg",
+  "Dungeon Skelett": "images/Gegner/skeleton.webp", "Cemetery Shade": "images/bosse/catacomb_boss.jpg"
 };
 
 const bDatenbankHTML = {
-  1: "images/icon_elite.webp", 2: "images/icon_loot.webp", 3: "images/icon_invader.png",
-  4: "images/icon_grace.png", 6: "images/icon_talisman.webp", 7: "images/icon_tree.webp",
-  8: "images/icon_tower.png", 9: "images/icon_quest.webp", 10: "images/icon_dungeon.webp",
-  11: "images/icon_skel.jpg", 12: "images/icon_chest.jpg", 13: "images/icon_run.jpg",
-  15: "images/fort-nightreign-full.jpg",
-  14: "images/Eldenringcaveofknowledge.jpeg"
+  1: "images/icons/icon_elite.webp", 2: "images/icons/icon_loot.webp", 3: "images/icons/icon_invader.png",
+  4: "images/icons/icon_grace.png", 6: "images/icons/icon_talisman.webp", 7: "images/icons/icon_tree.webp",
+  8: "images/icons/icon_tower.png", 9: "images/icons/icon_quest.webp", 10: "images/icons/icon_dungeon.webp",
+  11: "images/Gegner/icon_skel.jpg", 12: "images/icons/icon_chest.jpg", 13: "images/Gegner/icon_run.jpg",
+  15: "images/icons/fort-nightreign-full.jpg",
+  14: "images/background/Eldenringcaveofknowledge.jpeg"
 };
 
 const gewichteterPfadePool = [1, 1, 2, 2, 2, 3, 6, 9, 10, 14, 14];
@@ -1123,19 +1123,19 @@ function oeffneKlassenAuswahl() {
     <p style="color: #aaa; font-style: italic; font-size:1rem; margin-bottom:0;">${t('class_title')}</p>
     <div class="class-selection">
       <div class="class-card" onclick="waehleKlasseEngine('schwertkaempfer')">
-        <img class="class-card-art" src="images/tarnished_ritter.webp" alt="Vagabond" onerror="this.style.display='none'">
+        <img class="class-card-art" src="images/starter/tarnished_ritter.webp" alt="Vagabond" onerror="this.style.display='none'">
         <div class="class-card-banner">${t('class_vagabond')}</div>
         <div class="class-card-stats">${hardMode ? t('class_vagabond_stats_hard') : t('class_vagabond_stats')}</div>
         <div class="class-card-start">${t('class_vagabond_gear')}</div>
       </div>
       <div class="class-card" onclick="waehleKlasseEngine('samurai')">
-        <img class="class-card-art" src="images/tarnished_samurai.webp" alt="Samurai" onerror="this.style.display='none'">
+        <img class="class-card-art" src="images/starter/tarnished_samurai.webp" alt="Samurai" onerror="this.style.display='none'">
         <div class="class-card-banner">${t('class_samurai')}</div>
         <div class="class-card-stats">${hardMode ? t('class_samurai_stats_hard') : t('class_samurai_stats')}</div>
         <div class="class-card-start">${t('class_samurai_gear')}</div>
       </div>
       <div class="class-card" onclick="waehleKlasseEngine('nackt')">
-        <img class="class-card-art" src="images/tarnished_nackt.webp" alt="Wretch" onerror="this.style.display='none'">
+        <img class="class-card-art" src="images/starter/tarnished_nackt.webp" alt="Wretch" onerror="this.style.display='none'">
         <div class="class-card-banner">${t('class_wretch')}</div>
         <div class="class-card-stats">${hardMode ? t('class_wretch_stats_hard') : t('class_wretch_stats')}</div>
         <div class="class-card-start">${t('class_wretch_gear')}</div>
@@ -1182,9 +1182,9 @@ function waehleKlasseEngine(klasse) {
   if (startRuestungen[klasse] && activeChallenge !== "noarmor") setzeAusgeruesteteRuestung(startRuestungen[klasse]);
   if (activeChallenge === "noarmor") { ruestungName = t("no_armor"); ruestungRaritaet = "common"; ruestungReduktion = 0; ruestungBild = ""; } 
 
-  if (klasse === 'schwertkaempfer') { spielerMaxHp = 150; maxKlassenFlasks = hardMode ? 2 : 3; spielerFlasks = maxKlassenFlasks; basisAusweichChance = 0.30; playerImageStr = "images/tarnished_ritter.webp"; }
-  else if (klasse === 'samurai') { spielerMaxHp = 110; maxKlassenFlasks = hardMode ? 1 : 2; spielerFlasks = maxKlassenFlasks; basisAusweichChance = 0.40; playerImageStr = "images/tarnished_samurai.webp"; }
-  else if (klasse === 'nackt') { spielerMaxHp = 90; maxKlassenFlasks = hardMode ? 0 : 1; spielerFlasks = maxKlassenFlasks; basisAusweichChance = 0.50; playerImageStr = "images/tarnished_nackt.webp"; }
+  if (klasse === 'schwertkaempfer') { spielerMaxHp = 150; maxKlassenFlasks = hardMode ? 2 : 3; spielerFlasks = maxKlassenFlasks; basisAusweichChance = 0.30; playerImageStr = "images/starter/tarnished_ritter.webp"; }
+  else if (klasse === 'samurai') { spielerMaxHp = 110; maxKlassenFlasks = hardMode ? 1 : 2; spielerFlasks = maxKlassenFlasks; basisAusweichChance = 0.40; playerImageStr = "images/starter/tarnished_samurai.webp"; }
+  else if (klasse === 'nackt') { spielerMaxHp = 90; maxKlassenFlasks = hardMode ? 0 : 1; spielerFlasks = maxKlassenFlasks; basisAusweichChance = 0.50; playerImageStr = "images/starter/tarnished_nackt.webp"; }
   spielerHp = spielerMaxHp; document.getElementById("popup-content").classList.remove("klassen-modal"); document.getElementById("popup-overlay").style.display = "none";
   if (window.ER) ER.startRun(hardMode ? "hard" : "normal");
   speichereRun();
@@ -1199,16 +1199,16 @@ function baueKarteHTML() {
   if (grid.offsetParent === null) return; 
   
   if (inSubDungeon) {
-    mapScrollArea.style.backgroundImage = "linear-gradient(to bottom, rgba(5,5,5,0.85), rgba(15,10,5,0.95)), url('images/background_catacombs.jpg')";
+    mapScrollArea.style.backgroundImage = "linear-gradient(to bottom, rgba(5,5,5,0.85), rgba(15,10,5,0.95)), url('images/background/background_catacombs.jpg')";
   } else {
-    if (aktuelleRegion === "Limgrave") mapScrollArea.style.backgroundImage = "var(--map-overlay), url('images/limgrave.jpg')";
-    if (aktuelleRegion === "Caelid") mapScrollArea.style.backgroundImage = "linear-gradient(to bottom, rgba(5,5,5,0.75), rgba(5,5,5,0.85)), url('images/caelid.jpg')";
-    if (aktuelleRegion === "Leyndell") mapScrollArea.style.backgroundImage = "linear-gradient(to bottom, rgba(5,5,5,0.75), rgba(5,5,5,0.85)), url('images/leyndell.jpg')";
-    if (aktuelleRegion === "Mountaintops") mapScrollArea.style.backgroundImage = "linear-gradient(to bottom, rgba(5,5,5,0.75), rgba(5,5,5,0.85)), url('images/mountaintops.jpg')";
-    if (aktuelleRegion === "FarumAzula") mapScrollArea.style.backgroundImage = "linear-gradient(to bottom, rgba(5,5,5,0.75), rgba(5,5,5,0.85)), url('images/farumazula.jpg')";
-    if (aktuelleRegion === "AshenCapital") mapScrollArea.style.backgroundImage = "linear-gradient(to bottom, rgba(5,5,5,0.8), rgba(20,5,5,0.9)), url('images/ashencapital.avif')";
-    if (aktuelleRegion === "EldenThrone") mapScrollArea.style.backgroundImage = "linear-gradient(to bottom, rgba(20,15,5,0.8), rgba(5,5,5,0.95)), url('images/eldenthrone.jpg')";
-    if (aktuelleRegion === "Haligtree") mapScrollArea.style.backgroundImage = "linear-gradient(to bottom, rgba(15,25,10,0.75), rgba(5,5,5,0.95)), url('images/elden_ring_elphael_hero_2.avif')";
+    if (aktuelleRegion === "Limgrave") mapScrollArea.style.backgroundImage = "var(--map-overlay), url('images/background/limgrave.jpg')";
+    if (aktuelleRegion === "Caelid") mapScrollArea.style.backgroundImage = "linear-gradient(to bottom, rgba(5,5,5,0.75), rgba(5,5,5,0.85)), url('images/background/caelid.jpg')";
+    if (aktuelleRegion === "Leyndell") mapScrollArea.style.backgroundImage = "linear-gradient(to bottom, rgba(5,5,5,0.75), rgba(5,5,5,0.85)), url('images/background/leyndell.jpg')";
+    if (aktuelleRegion === "Mountaintops") mapScrollArea.style.backgroundImage = "linear-gradient(to bottom, rgba(5,5,5,0.75), rgba(5,5,5,0.85)), url('images/background/mountaintops.jpg')";
+    if (aktuelleRegion === "FarumAzula") mapScrollArea.style.backgroundImage = "linear-gradient(to bottom, rgba(5,5,5,0.75), rgba(5,5,5,0.85)), url('images/background/farumazula.jpg')";
+    if (aktuelleRegion === "AshenCapital") mapScrollArea.style.backgroundImage = "linear-gradient(to bottom, rgba(5,5,5,0.8), rgba(20,5,5,0.9)), url('images/background/ashencapital.avif')";
+    if (aktuelleRegion === "EldenThrone") mapScrollArea.style.backgroundImage = "linear-gradient(to bottom, rgba(20,15,5,0.8), rgba(5,5,5,0.95)), url('images/background/eldenthrone.jpg')";
+    if (aktuelleRegion === "Haligtree") mapScrollArea.style.backgroundImage = "linear-gradient(to bottom, rgba(15,25,10,0.75), rgba(5,5,5,0.95)), url('images/background/elden_ring_elphael_hero_2.avif')";
   }
 
   netzKarte.forEach(zeile => {
@@ -1220,17 +1220,17 @@ function baueKarteHTML() {
       
       if (knoten.typ === 5) {
         nodeDiv.classList.add("boss-node"); imgTag.classList.add("map-node-boss-img"); imgTag.classList.remove("map-node-img");
-        if (inSubDungeon) imgTag.src = "images/catacomb_boss.jpg";
+        if (inSubDungeon) imgTag.src = "images/bosse/catacomb_boss.jpg";
         else {
-          if (aktuelleRegion === "Limgrave") imgTag.src = "images/godrick.webp"; else if (aktuelleRegion === "Caelid") imgTag.src = "images/radahn.webp";
-          else if (aktuelleRegion === "Leyndell") imgTag.src = "images/Morgott.webp"; else if (aktuelleRegion === "Mountaintops") imgTag.src = "images/firegiant.avif";
-          else if (aktuelleRegion === "FarumAzula") imgTag.src = "images/maliketh.jpg"; else if (aktuelleRegion === "AshenCapital") imgTag.src = "images/gideon.webp";
-          else if (aktuelleRegion === "EldenThrone" && zeile.ebene === 1) imgTag.src = "images/godfrey.webp";
-          else if (aktuelleRegion === "EldenThrone" && zeile.ebene === 3) imgTag.src = "images/radagon.jpg";
-          else if (aktuelleRegion === "Haligtree") imgTag.src = "images/maleniap1.webp";
+          if (aktuelleRegion === "Limgrave") imgTag.src = "images/bosse/godrick.webp"; else if (aktuelleRegion === "Caelid") imgTag.src = "images/bosse/radahn.webp";
+          else if (aktuelleRegion === "Leyndell") imgTag.src = "images/bosse/Morgott.webp"; else if (aktuelleRegion === "Mountaintops") imgTag.src = "images/bosse/firegiant.avif";
+          else if (aktuelleRegion === "FarumAzula") imgTag.src = "images/bosse/maliketh.jpg"; else if (aktuelleRegion === "AshenCapital") imgTag.src = "images/bosse/gideon.webp";
+          else if (aktuelleRegion === "EldenThrone" && zeile.ebene === 1) imgTag.src = "images/bosse/godfrey.webp";
+          else if (aktuelleRegion === "EldenThrone" && zeile.ebene === 3) imgTag.src = "images/bosse/radagon.jpg";
+          else if (aktuelleRegion === "Haligtree") imgTag.src = "images/bosse/maleniap1.webp";
         }
       } else {
-        let iconPfad = bDatenbankHTML[knoten.typ] || "images/icon_loot.webp"; imgTag.src = iconPfad;
+        let iconPfad = bDatenbankHTML[knoten.typ] || "images/icons/icon_loot.webp"; imgTag.src = iconPfad;
         if (!iconPfad.toLowerCase().endsWith(".png")) imgTag.classList.add("fullbleed"); 
       }
       nodeDiv.appendChild(imgTag);
@@ -1433,11 +1433,11 @@ function updateUI() {
     } else { affInfo.style.display = "none"; }
 
     if (TOWER) document.getElementById("enemy-img").src = towerBossBild || "";
-    else if (aktuellerKnotenTyp === 15) document.getElementById("enemy-img").src = bilderDatenbankBosse[gegnerName] || "images/fort-nightreign-full.jpg";
-    else if (aktuellerKnotenTyp === 9) document.getElementById("enemy-img").src = "images/blaidd.avif";
+    else if (aktuellerKnotenTyp === 15) document.getElementById("enemy-img").src = bilderDatenbankBosse[gegnerName] || "images/icons/fort-nightreign-full.jpg";
+    else if (aktuellerKnotenTyp === 9) document.getElementById("enemy-img").src = "images/Gegner/blaidd.avif";
     else if (aktuellerKnotenTyp === 14) { let mb = gibAktuellenMiniboss(); document.getElementById("enemy-img").src = (mb.bild === "__TARNISHED__") ? playerImageStr : mb.bild; }
     else if (aktuellerKnotenTyp === 5) document.getElementById("enemy-img").src = bilderDatenbankBosse[gegnerName] || "";
-    else if (aktuellerKnotenTyp === 11) document.getElementById("enemy-img").src = "images/skeleton.webp";
+    else if (aktuellerKnotenTyp === 11) document.getElementById("enemy-img").src = "images/Gegner/skeleton.webp";
     else if (gebietsGegnerKonfig[aktuelleRegion]) {
       if (aktuellerKnotenTyp === 1) document.getElementById("enemy-img").src = gebietsGegnerKonfig[aktuelleRegion].elite;
       else if (aktuellerKnotenTyp === 2) document.getElementById("enemy-img").src = gebietsGegnerKonfig[aktuelleRegion].waechter;
@@ -1445,12 +1445,12 @@ function updateUI() {
     }
     
     let arenaView = document.getElementById("battle-view");
-    if (inSubDungeon) arenaView.style.backgroundImage = "linear-gradient(to bottom, rgba(15,5,5,0.7), rgba(5,5,5,0.95)), url('images/background_catacombs.jpg')";
+    if (inSubDungeon) arenaView.style.backgroundImage = "linear-gradient(to bottom, rgba(15,5,5,0.7), rgba(5,5,5,0.95)), url('images/background/background_catacombs.jpg')";
     else {
-      if (aktuelleRegion === "Haligtree") arenaView.style.backgroundImage = "linear-gradient(to bottom, rgba(15,25,10,0.6), rgba(5,5,5,0.9)), url('images/elden_ring_elphael_hero_2.avif')";
-      else if (aktuelleRegion === "AshenCapital") arenaView.style.backgroundImage = "linear-gradient(to bottom, rgba(20,5,5,0.6), rgba(5,5,5,0.9)), url('images/ashencapital.avif')";
-      else if (aktuelleRegion === "EldenThrone") arenaView.style.backgroundImage = "linear-gradient(to bottom, rgba(40,30,10,0.5), rgba(5,5,5,0.9)), url('images/eldenthrone.jpg')";
-      else if (aktuelleRegion === "Haligtree") arenaView.style.backgroundImage = "linear-gradient(to bottom, rgba(20,30,15,0.5), rgba(5,5,5,0.9)), url('images/elden_ring_elphael_hero_2.avif')";
+      if (aktuelleRegion === "Haligtree") arenaView.style.backgroundImage = "linear-gradient(to bottom, rgba(15,25,10,0.6), rgba(5,5,5,0.9)), url('images/background/elden_ring_elphael_hero_2.avif')";
+      else if (aktuelleRegion === "AshenCapital") arenaView.style.backgroundImage = "linear-gradient(to bottom, rgba(20,5,5,0.6), rgba(5,5,5,0.9)), url('images/background/ashencapital.avif')";
+      else if (aktuelleRegion === "EldenThrone") arenaView.style.backgroundImage = "linear-gradient(to bottom, rgba(40,30,10,0.5), rgba(5,5,5,0.9)), url('images/background/eldenthrone.jpg')";
+      else if (aktuelleRegion === "Haligtree") arenaView.style.backgroundImage = "linear-gradient(to bottom, rgba(20,30,15,0.5), rgba(5,5,5,0.9)), url('images/background/elden_ring_elphael_hero_2.avif')";
       else arenaView.style.backgroundImage = `linear-gradient(to bottom, rgba(11,11,11,0.3), rgba(11,11,11,0.6)), url('images/${aktuelleRegion.toLowerCase()}.jpg')`;
     }
 
@@ -1561,8 +1561,8 @@ function oeffneMedallionChoicePopup() {
   content.innerHTML = `
     <h3 style="color:#d4af37; font-size:1.6rem; margin-top:0; letter-spacing:2px; font-family:'Mantinia', serif;">${t("medallion_choice_title")}</h3>
     <div style="display:flex; justify-content:center; gap:6px; margin:6px 0 4px;">
-      <img src="images/ER_Icon_Key_Item_Haligtree_Secret_Medallion_29.webp" style="width:48px;height:48px;" onerror="this.style.display='none'">
-      <img src="images/ER_Icon_Key_Item_Haligtree_Secret_Medallion_(Right).webp" style="width:48px;height:48px;" onerror="this.style.display='none'">
+      <img src="images/icons/ER_Icon_Key_Item_Haligtree_Secret_Medallion_29.webp" style="width:48px;height:48px;" onerror="this.style.display='none'">
+      <img src="images/icons/ER_Icon_Key_Item_Haligtree_Secret_Medallion_(Right).webp" style="width:48px;height:48px;" onerror="this.style.display='none'">
     </div>
     <p style="color:#ddd; font-size:0.95rem; font-family: sans-serif;">${t("medallion_choice_desc")}</p>
     <button class="btn-modal-action" onclick="medallionHeben()">${t("medallion_choice_yes")}</button>
@@ -1587,9 +1587,9 @@ function looteDungeonChest(naechsteEbene) {
   
   if (gewinnChance) {
     let itemTypes = [
-      { type: "hp", name: t("item_dumpling"), desc: t("item_dumpling_desc"), icon: "❤️", bild: "images/raw_meat_dumpling.png" },
-      { type: "dodge", name: t("item_neck"), desc: t("item_neck_desc"), icon: "💨", bild: "images/pickled_turtle_neck.png" },
-      { type: "dmg", name: t("item_flesh"), desc: t("item_flesh_desc"), icon: "⚔️", bild: "images/exalted_flesh.png" }
+      { type: "hp", name: t("item_dumpling"), desc: t("item_dumpling_desc"), icon: "❤️", bild: "images/icons/raw_meat_dumpling.png" },
+      { type: "dodge", name: t("item_neck"), desc: t("item_neck_desc"), icon: "💨", bild: "images/icons/pickled_turtle_neck.png" },
+      { type: "dmg", name: t("item_flesh"), desc: t("item_flesh_desc"), icon: "⚔️", bild: "images/icons/exalted_flesh.png" }
     ];
     let gefundenesItem = itemTypes[Math.floor(Math.random() * itemTypes.length)];
     let emptySlotIdx = backpackItems.indexOf(null);
@@ -1809,27 +1809,27 @@ function heileUndRegeneriereVoll(nurHp) {
 /* ============ BATTLE TOWER ============ */
 // Pool A: nur Bosse, die bereits Bilder im Spiel haben. PCR ist der Endboss auf Ebene 50.
 const TOWER_BOSS_POOL = [
-  { n:"Godrick, der Verpflanzte",                 hp:160, dmg:14, bild:"images/godrick.webp" },
-  { n:"Sternengeißel Radahn",                     hp:180, dmg:15, bild:"images/radahn.webp" },
-  { n:"Morgott, der Omenkönig",                   hp:175, dmg:15, bild:"images/Morgott.webp" },
-  { n:"Feuerriese",                               hp:195, dmg:16, bild:"images/firegiant.avif" },
-  { n:"Maliketh, die Schwarze Klinge",            hp:185, dmg:16, bild:"images/maliketh.jpg" },
-  { n:"Gideon Ofnir, der Allwissende",            hp:165, dmg:14, bild:"images/gideon.webp" },
-  { n:"Godfrey, der Erste Eldenlord",             hp:190, dmg:16, bild:"images/godfrey.webp" },
-  { n:"Radagon von der Goldenen Ordnung",         hp:195, dmg:16, bild:"images/radagon.jpg" },
-  { n:"Eldenbiest",                               hp:200, dmg:17, bild:"images/eldenbeast.jpg" },
-  { n:"Loretta, Knight of the Haligtree",         hp:170, dmg:15, bild:"images/loretta-knight-of-haligtree.jpg" },
-  { n:"Commander Niall",                          hp:180, dmg:15, bild:"images/commander-niall-elden-ring-wiki.jpg" },
-  { n:"Malenia, Goddess of Rot",                  hp:200, dmg:17, bild:"images/malenia-2nd-phase-flying.avif" },
-  { n:"Blaidd, der Halbwolf",                     hp:165, dmg:14, bild:"images/blaidd.avif" },
-  { n:"Beastman of Farum Azula",                  hp:150, dmg:13, bild:"images/miniboss_beastman.jpg" },
-  { n:"Cleanrot Knight",                          hp:160, dmg:14, bild:"images/miniboss_cleanrot_knight.png" },
-  { n:"Omenkiller & Miranda the Blighted Bloom",  hp:165, dmg:14, bild:"images/miniboss_omenkiller.jpg" },
-  { n:"Erdtree Avatar",                           hp:170, dmg:15, bild:"images/miniboss_erdtree_avatar.webp" },
-  { n:"Dragonkin Soldier",                        hp:180, dmg:15, bild:"images/miniboss_dragonkin_soldier.png" }
+  { n:"Godrick, der Verpflanzte",                 hp:160, dmg:14, bild:"images/bosse/godrick.webp" },
+  { n:"Sternengeißel Radahn",                     hp:180, dmg:15, bild:"images/bosse/radahn.webp" },
+  { n:"Morgott, der Omenkönig",                   hp:175, dmg:15, bild:"images/bosse/Morgott.webp" },
+  { n:"Feuerriese",                               hp:195, dmg:16, bild:"images/bosse/firegiant.avif" },
+  { n:"Maliketh, die Schwarze Klinge",            hp:185, dmg:16, bild:"images/bosse/maliketh.jpg" },
+  { n:"Gideon Ofnir, der Allwissende",            hp:165, dmg:14, bild:"images/bosse/gideon.webp" },
+  { n:"Godfrey, der Erste Eldenlord",             hp:190, dmg:16, bild:"images/bosse/godfrey.webp" },
+  { n:"Radagon von der Goldenen Ordnung",         hp:195, dmg:16, bild:"images/bosse/radagon.jpg" },
+  { n:"Eldenbiest",                               hp:200, dmg:17, bild:"images/bosse/eldenbeast.jpg" },
+  { n:"Loretta, Knight of the Haligtree",         hp:170, dmg:15, bild:"images/bosse/loretta-knight-of-haligtree.jpg" },
+  { n:"Commander Niall",                          hp:180, dmg:15, bild:"images/bosse/commander-niall-elden-ring-wiki.jpg" },
+  { n:"Malenia, Goddess of Rot",                  hp:200, dmg:17, bild:"images/bosse/malenia-2nd-phase-flying.avif" },
+  { n:"Blaidd, der Halbwolf",                     hp:165, dmg:14, bild:"images/Gegner/blaidd.avif" },
+  { n:"Beastman of Farum Azula",                  hp:150, dmg:13, bild:"images/Gegner/miniboss_beastman.jpg" },
+  { n:"Cleanrot Knight",                          hp:160, dmg:14, bild:"images/Gegner/miniboss_cleanrot_knight.png" },
+  { n:"Omenkiller & Miranda the Blighted Bloom",  hp:165, dmg:14, bild:"images/Gegner/miniboss_omenkiller.jpg" },
+  { n:"Erdtree Avatar",                           hp:170, dmg:15, bild:"images/Gegner/miniboss_erdtree_avatar.webp" },
+  { n:"Dragonkin Soldier",                        hp:180, dmg:15, bild:"images/Gegner/miniboss_dragonkin_soldier.png" }
 ];
-// Endboss Ebene 50 — Bild bitte als images/pcr.jpg ergaenzen (Fallback: Radahn-Bild).
-const TOWER_ENDBOSS = { n:"Promised Consort Radahn", hp:520, dmg:30, bild:"images/pcr.jpg", fallback:"images/radahn.webp" };
+// Endboss Ebene 50 — Bild bitte als images/bosse/pcr.webp ergaenzen (Fallback: Radahn-Bild).
+const TOWER_ENDBOSS = { n:"Promised Consort Radahn", hp:520, dmg:30, bild:"images/bosse/pcr.webp", fallback:"images/bosse/radahn.webp" };
 
 function starteTowerFloor() {
   let hpMult  = 1 + (towerFloor - 1) * 0.07;   // Bosse werden pro Ebene staerker
@@ -1853,7 +1853,7 @@ function starteTowerFloor() {
   imKampf = true; aktionsSperre = false; inSubDungeon = false;
   let img = document.getElementById("enemy-img");
   img.onerror = function () { this.onerror = null; if (boss.fallback) { towerBossBild = boss.fallback; this.src = boss.fallback; } };
-  document.getElementById("enemy-name").innerText = gegnerNameLoc(gegnerName);
+  document.getElementById("arena-enemy-name").innerText = gegnerNameLoc(gegnerName);
   document.getElementById("battle-log").innerText = "🏯 " + t("tower_floor", { n: towerFloor }) + " — " + gegnerNameLoc(gegnerName) + "!";
   speichereRun(); updateUI();
 }
@@ -1913,7 +1913,7 @@ function kampfGewonnen() {
 
   if (aktuellerKnotenTyp === 15) {
     medallionHalves = Math.min(2, medallionHalves + 1);
-    let medalImg = medallionHalves === 1 ? "images/ER_Icon_Key_Item_Haligtree_Secret_Medallion_(Right).webp" : "images/ER_Icon_Key_Item_Haligtree_Secret_Medallion_29.webp";
+    let medalImg = medallionHalves === 1 ? "images/icons/ER_Icon_Key_Item_Haligtree_Secret_Medallion_(Right).webp" : "images/icons/ER_Icon_Key_Item_Haligtree_Secret_Medallion_29.webp";
     oeffneStatPopup(t("fortress_victory_title"), t("fortress_victory_desc", { n: medallionHalves }) + '\n\n<img src="' + medalImg + '" style="width:64px;height:64px;margin-top:8px;" onerror="this.style.display=\'none\'">', naechsteEbene);
     speichereRun(); updateUI(); return;
   }
@@ -1950,8 +1950,8 @@ function kampfGewonnen() {
   if (gegnerName === "Malenia, Blade of Miquella") {
     document.getElementById("battle-log").innerText = t("malenia_phase2_transition");
     gegnerName = "Malenia, Goddess of Rot"; gegnerMaxHp = 2750; gegnerHp = gegnerMaxHp; gegnerSchaden = 150;
-    document.getElementById("enemy-name").innerText = gegnerNameLoc(gegnerName);
-    document.getElementById("enemy-img").src = "images/malenia-2nd-phase-flying.avif";
+    document.getElementById("arena-enemy-name").innerText = gegnerNameLoc(gegnerName);
+    document.getElementById("enemy-img").src = "images/bosse/malenia-2nd-phase-flying.avif";
     document.getElementById("battle-enemy-hp").max = gegnerMaxHp; document.getElementById("battle-enemy-hp").value = gegnerHp;
     document.getElementById("arena-enemy-hp-text").innerText = gegnerHp + " / " + gegnerMaxHp;
     if (activeChallenge === "autobattle") setTimeout(autoBattleTick, 900);
