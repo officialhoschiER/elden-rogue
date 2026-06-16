@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Elden Rogue - Spielbereich</title>
-  <link rel="icon" type="image/png" href="images/favicon.png">
+  <link rel="icon" type="image/png" href="images/flavicon.png">
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -536,10 +536,19 @@ h1, h2, h3, .btn-menu, .btn-combat, .btn-social, .game-author-tag, #region-displ
 <div id="talisman-float-tip"></div>
 
 <script>
-const urlParams = new URLSearchParams(window.location.search);
+// Toleriert ein versehentliches zweites "?" in der URL (z.B. ?challenge=haligtree?debug=1),
+// indem alle "?" als Parameter-Trenner "&" behandelt werden.
+const urlParams = new URLSearchParams(window.location.search.replace(/\?/g, "&"));
 const hardMode = urlParams.get("mode") === "hard";
 const resumeRun = urlParams.get("resume") === "true";
 let activeChallenge = urlParams.get("challenge") || "";
+
+// ===== BATTLE TOWER =====
+const TOWER = activeChallenge === "tower";
+const TOWER_EBENEN = 50;          // Gesamtzahl der Ebenen
+let towerFloor = 0;               // aktuelle Ebene (1..50)
+let towerBaseHp = 0;              // Klassen-Basis-HP (für die Skalierung)
+let towerBossBild = "";           // Bild des aktuellen Tower-Bosses
 
 // ===== TEST-/DEBUG-MODUS: 9999 Schaden pro Treffer =====
 // Aktivierung über die URL, z.B.:  game.html?debug=1   oder kombiniert:  game.html?challenge=haligtree&debug=1
@@ -1179,6 +1188,7 @@ function waehleKlasseEngine(klasse) {
   spielerHp = spielerMaxHp; document.getElementById("popup-content").classList.remove("klassen-modal"); document.getElementById("popup-overlay").style.display = "none";
   if (window.ER) ER.startRun(hardMode ? "hard" : "normal");
   speichereRun();
+  if (TOWER) { towerFloor = 1; towerBaseHp = spielerMaxHp; starteTowerFloor(); return; }
   updateUI();
 }
 
@@ -1422,7 +1432,8 @@ function updateUI() {
       affInfo.innerHTML = teile.join("<br>"); affInfo.style.display = "block";
     } else { affInfo.style.display = "none"; }
 
-    if (aktuellerKnotenTyp === 15) document.getElementById("enemy-img").src = bilderDatenbankBosse[gegnerName] || "images/fort-nightreign-full.jpg";
+    if (TOWER) document.getElementById("enemy-img").src = towerBossBild || "";
+    else if (aktuellerKnotenTyp === 15) document.getElementById("enemy-img").src = bilderDatenbankBosse[gegnerName] || "images/fort-nightreign-full.jpg";
     else if (aktuellerKnotenTyp === 9) document.getElementById("enemy-img").src = "images/blaidd.avif";
     else if (aktuellerKnotenTyp === 14) { let mb = gibAktuellenMiniboss(); document.getElementById("enemy-img").src = (mb.bild === "__TARNISHED__") ? playerImageStr : mb.bild; }
     else if (aktuellerKnotenTyp === 5) document.getElementById("enemy-img").src = bilderDatenbankBosse[gegnerName] || "";
@@ -1517,7 +1528,7 @@ function klickeKnoten(ebene, knoten) {
       else if (aktuelleRegion === "FarumAzula") { gegnerName = "Maliketh, die Schwarze Klinge"; gegnerMaxHp = 1350; gegnerSchaden = 75; }
       else if (aktuelleRegion === "AshenCapital") { gegnerName = "Gideon Ofnir, der Allwissende"; gegnerMaxHp = 1600; gegnerSchaden = 85; }
       else if (aktuelleRegion === "Haligtree") {
-        gegnerName = "Malenia, Blade of Miquella"; gegnerMaxHp = Math.round(2800 * rMult); gegnerSchaden = Math.round(120 * rMult);
+        gegnerName = "Malenia, Blade of Miquella"; gegnerMaxHp = 2750; gegnerSchaden = 130;
       }
       else if (aktuelleRegion === "EldenThrone") {
         if (ebene === 1) { gegnerName = "Godfrey, der Erste Eldenlord"; gegnerMaxHp = 1800; gegnerSchaden = 100; }
@@ -1795,7 +1806,86 @@ function heileUndRegeneriereVoll(nurHp) {
   if (!nurHp) spielerFlasks = maxKlassenFlasks;
 }
 
+/* ============ BATTLE TOWER ============ */
+// Pool A: nur Bosse, die bereits Bilder im Spiel haben. PCR ist der Endboss auf Ebene 50.
+const TOWER_BOSS_POOL = [
+  { n:"Godrick, der Verpflanzte",                 hp:160, dmg:14, bild:"images/godrick.webp" },
+  { n:"Sternengeißel Radahn",                     hp:180, dmg:15, bild:"images/radahn.webp" },
+  { n:"Morgott, der Omenkönig",                   hp:175, dmg:15, bild:"images/Morgott.webp" },
+  { n:"Feuerriese",                               hp:195, dmg:16, bild:"images/firegiant.avif" },
+  { n:"Maliketh, die Schwarze Klinge",            hp:185, dmg:16, bild:"images/maliketh.jpg" },
+  { n:"Gideon Ofnir, der Allwissende",            hp:165, dmg:14, bild:"images/gideon.webp" },
+  { n:"Godfrey, der Erste Eldenlord",             hp:190, dmg:16, bild:"images/godfrey.webp" },
+  { n:"Radagon von der Goldenen Ordnung",         hp:195, dmg:16, bild:"images/radagon.jpg" },
+  { n:"Eldenbiest",                               hp:200, dmg:17, bild:"images/eldenbeast.jpg" },
+  { n:"Loretta, Knight of the Haligtree",         hp:170, dmg:15, bild:"images/loretta-knight-of-haligtree.jpg" },
+  { n:"Commander Niall",                          hp:180, dmg:15, bild:"images/commander-niall-elden-ring-wiki.jpg" },
+  { n:"Malenia, Goddess of Rot",                  hp:200, dmg:17, bild:"images/malenia-2nd-phase-flying.avif" },
+  { n:"Blaidd, der Halbwolf",                     hp:165, dmg:14, bild:"images/blaidd.avif" },
+  { n:"Beastman of Farum Azula",                  hp:150, dmg:13, bild:"images/miniboss_beastman.jpg" },
+  { n:"Cleanrot Knight",                          hp:160, dmg:14, bild:"images/miniboss_cleanrot_knight.png" },
+  { n:"Omenkiller & Miranda the Blighted Bloom",  hp:165, dmg:14, bild:"images/miniboss_omenkiller.jpg" },
+  { n:"Erdtree Avatar",                           hp:170, dmg:15, bild:"images/miniboss_erdtree_avatar.webp" },
+  { n:"Dragonkin Soldier",                        hp:180, dmg:15, bild:"images/miniboss_dragonkin_soldier.png" }
+];
+// Endboss Ebene 50 — Bild bitte als images/pcr.jpg ergaenzen (Fallback: Radahn-Bild).
+const TOWER_ENDBOSS = { n:"Promised Consort Radahn", hp:520, dmg:30, bild:"images/pcr.jpg", fallback:"images/radahn.webp" };
+
+function starteTowerFloor() {
+  let hpMult  = 1 + (towerFloor - 1) * 0.07;   // Bosse werden pro Ebene staerker
+  let dmgMult = 1 + (towerFloor - 1) * 0.05;
+  let boss = (towerFloor >= TOWER_EBENEN) ? TOWER_ENDBOSS : TOWER_BOSS_POOL[Math.floor(Math.random() * TOWER_BOSS_POOL.length)];
+
+  gegnerName    = boss.n;
+  gegnerMaxHp   = Math.round(boss.hp * hpMult);
+  gegnerHp      = gegnerMaxHp;
+  gegnerSchaden = Math.round(boss.dmg * dmgMult);
+  towerBossBild = boss.bild;
+
+  // Spieler skaliert mit: +1 Waffenstufe pro Ebene, Basis-HP waechst, volle HP & Flakons je Ebene
+  waffenUpgrade = 2 + (towerFloor - 1);   // +2 Startbonus, dann +1 Stufe pro Ebene
+  spielerMaxHp  = Math.round(towerBaseHp * (1 + (towerFloor - 1) * 0.06));
+  spielerHp     = berechneFinalMaxHp();
+  spielerFlasks = maxKlassenFlasks;
+
+  if (window.ER) ER.reachStage(towerFloor); // Fortschritt fuer Score/Bestenliste
+
+  imKampf = true; aktionsSperre = false; inSubDungeon = false;
+  let img = document.getElementById("enemy-img");
+  img.onerror = function () { this.onerror = null; if (boss.fallback) { towerBossBild = boss.fallback; this.src = boss.fallback; } };
+  document.getElementById("enemy-name").innerText = gegnerNameLoc(gegnerName);
+  document.getElementById("battle-log").innerText = "🏯 " + t("tower_floor", { n: towerFloor }) + " — " + gegnerNameLoc(gegnerName) + "!";
+  speichereRun(); updateUI();
+}
+
+function towerSiegBehandeln() {
+  if (window.ER) { ER.fightWon(); ER.bossKilled(gegnerName); }
+  if (towerFloor >= TOWER_EBENEN) {            // PCR besiegt -> Tower geschafft
+    imKampf = false;
+    if (window.ER) ER.gameCompleted();
+    oeffneAbschlussPopup(t("tower_win_title"), t("tower_win_desc"));
+    return;
+  }
+  towerFloor++;
+  oeffneTowerPopup();
+}
+
+function oeffneTowerPopup() {
+  let overlay = document.getElementById("popup-overlay"); let content = document.getElementById("popup-content");
+  content.innerHTML =
+    '<h3 style="color:#d4af37; font-size:1.5rem; margin-top:0; letter-spacing:2px; font-family:\'Mantinia\', serif;">🏯 ' + t("tower_next_title") + '</h3>' +
+    '<p style="color:#ddd; font-size:1.05rem; font-family: sans-serif;">' + t("tower_floor", { n: towerFloor }) + ' / ' + TOWER_EBENEN + '</p>' +
+    '<p style="color:#9aa0a6; font-size:0.85rem; font-family: sans-serif;">' + t("tower_next_desc") + '</p>' +
+    '<button class="btn-modal-action" onclick="towerWeiter()">' + t("tower_continue") + '</button>';
+  overlay.style.display = "flex";
+}
+function towerWeiter() {
+  document.getElementById("popup-overlay").style.display = "none";
+  starteTowerFloor();
+}
+
 function kampfGewonnen() {
+  if (TOWER) { towerSiegBehandeln(); return; }
   if (gegnerName === "Radagon von der Goldenen Ordnung") {
     gegnerName = "Eldenbiest"; gegnerMaxHp = 2500; gegnerHp = 2500; gegnerSchaden = 120;
     document.getElementById("battle-log").innerText = t("elden_beast_transition"); aktionsSperre = false; updateUI(); return;
@@ -1859,7 +1949,7 @@ function kampfGewonnen() {
   // Malenia Phase 2
   if (gegnerName === "Malenia, Blade of Miquella") {
     document.getElementById("battle-log").innerText = t("malenia_phase2_transition");
-    gegnerName = "Malenia, Goddess of Rot"; gegnerMaxHp = Math.round(gegnerMaxHp * 1.3); gegnerHp = gegnerMaxHp; gegnerSchaden = Math.round(gegnerSchaden * 1.4);
+    gegnerName = "Malenia, Goddess of Rot"; gegnerMaxHp = 2750; gegnerHp = gegnerMaxHp; gegnerSchaden = 150;
     document.getElementById("enemy-name").innerText = gegnerNameLoc(gegnerName);
     document.getElementById("enemy-img").src = "images/malenia-2nd-phase-flying.avif";
     document.getElementById("battle-enemy-hp").max = gegnerMaxHp; document.getElementById("battle-enemy-hp").value = gegnerHp;
