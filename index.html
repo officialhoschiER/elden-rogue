@@ -269,16 +269,6 @@
   <div class="modal-box">
     <button class="modal-close" onclick="closeModals()">&times;</button>
     <div class="modal-title" id="ch-title">Challenge Runs</div>
-    <div class="challenge-card" style="border-color: var(--gold); background:#141008;">
-      <div class="ch-icon">🏯</div>
-      <div>
-        <div class="ch-name" id="ch-tower-name" style="color:#e6a23c;">Battle Tower</div>
-        <div class="ch-desc" id="ch-tower-desc">50 Ebenen, zufällige Bosse, die mit jeder Etappe stärker werden. Am Ende: Promised Consort Radahn.</div>
-      </div>
-      <div class="ch-btns">
-        <a href="#" onclick="return checkOverwrite('game.html?challenge=tower')" class="btn-mini" style="border-color:#e6a23c; color:#e6a23c;">Start ⚔️</a>
-      </div>
-    </div>
     <div class="challenge-card">
       <div class="ch-icon">🛡️</div>
       <div>
@@ -333,11 +323,10 @@
   <div class="modal-box">
     <button class="modal-close" onclick="closeModals()">&times;</button>
     <div class="modal-title" id="lb-title">Bestenliste</div>
-    <div class="mode-tabs" id="lb-mode-tabs">
-      <button class="mode-tab active" id="lb-tab-normal" onclick="switchLbMode('normal')">Normal</button>
-      <button class="mode-tab" id="lb-tab-hard" onclick="switchLbMode('hard')">Hard</button>
+    <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; align-items:center; margin:2px 0 12px;">
+      <select id="lb-kategorie" onchange="ladeBestenliste()" style="background:#111; color:#cdbfa3; border:1px solid var(--gold-dark); padding:4px 12px; font-family:'Mantinia',serif; font-size:0.75rem; letter-spacing:1px; border-radius:3px; cursor:pointer;"></select>
+      <select id="lb-patch" onchange="ladeBestenliste()" style="background:#111; color:var(--gold); border:1px solid var(--gold-dark); padding:4px 12px; font-family:'Mantinia',serif; font-size:0.75rem; letter-spacing:1px; border-radius:3px; cursor:pointer;"><option value="1.5" selected>PATCH v1.5</option><option value="1.4">PATCH v1.4</option><option value="1.3">PATCH v1.3</option></select>
     </div>
-    <div style="text-align:center; margin:-4px 0 12px;"><select id="lb-patch" onchange="ladeBestenliste()" style="background:#111; color:var(--gold); border:1px solid var(--gold-dark); padding:4px 12px; font-family:'Mantinia',serif; font-size:0.75rem; letter-spacing:1px; border-radius:3px; cursor:pointer;"><option value="1.4" selected>PATCH v1.4</option><option value="1.3">PATCH v1.3</option></select></div>
     <div id="lb-status" class="muted">Lade Bestenliste…</div>
     <table class="lb-table hidden" id="lb-table">
       <thead><tr><th>#</th><th id="th-player">Befleckter</th><th id="th-stage">Etappe</th><th id="th-bosses">Bosse</th><th style="text-align:right;" id="th-score">Score</th></tr></thead>
@@ -391,9 +380,8 @@
       : "Ein Elden-Ring-Roguelike: Wähle deinen Pfad über eine verzweigte Karte, besiege Feinde und Bosse, sammle Waffen, Rüstungen und Talismane – und kämpfe dich durch die Zwischenlande bis zum Eldenthron. Jeder Run ist zufällig, jeder Tod endgültig.";
     
     document.getElementById("btn-hard").innerText = lang === 'en' ? "Hard Mode" : "Schwerer Modus";
-    // Mode tab labels
-    document.getElementById("lb-tab-normal").innerText = t("lb_mode_normal");
-    document.getElementById("lb-tab-hard").innerText = t("lb_mode_hard");
+    // Bestenlisten-Kategorien (Dropdown) in aktueller Sprache füllen
+    fuelleLbKategorien(t);
 
     // Challenge labels
     document.getElementById("ch-title").innerText = t("challenge_title");
@@ -403,8 +391,6 @@
     document.getElementById("ch-noarmor-desc").innerText = t("challenge_noarmor_desc");
     document.getElementById("ch-noarmor-btn-n").innerText = t("lb_mode_normal");
     document.getElementById("ch-noarmor-btn-h").innerText = t("lb_mode_hard");
-    document.getElementById("ch-tower-name").innerText = t("challenge_tower");
-    document.getElementById("ch-tower-desc").innerText = t("challenge_tower_desc");
     document.getElementById("ch-noblaidd-name").innerText = t("challenge_noblaidd");
     document.getElementById("ch-noblaidd-desc").innerText = t("challenge_noblaidd_desc");
     document.getElementById("ch-auto-name").innerText = t("challenge_autobattle");
@@ -466,13 +452,24 @@
   });
 
   /* ===== Modal Handling ===== */
-  let lbMode = "normal", achMode = "normal";
+  let achMode = "normal";
 
-  function switchLbMode(m) {
-    lbMode = m;
-    document.getElementById("lb-tab-normal").classList.toggle("active", m === "normal");
-    document.getElementById("lb-tab-hard").classList.toggle("active", m === "hard");
-    ladeBestenliste();
+  var LB_CATS = [
+    ["normal",     "lb_cat_normal"],
+    ["hard",       "lb_cat_hard"],
+    ["tower",      "lb_cat_tower"],
+    ["noarmor",    "challenge_noarmor"],
+    ["noblaidd",   "challenge_noblaidd"],
+    ["autobattle", "challenge_autobattle"],
+    ["haligtree",  "challenge_haligtree"]
+  ];
+  function fuelleLbKategorien(t) {
+    var sel = document.getElementById("lb-kategorie"); if (!sel) return;
+    if (!t) t = window.i18n ? window.i18n.t : function (k) { return k; };
+    var cur = sel.value || "normal";
+    sel.innerHTML = LB_CATS.map(function (c) {
+      return '<option value="' + c[0] + '"' + (c[0] === cur ? ' selected' : '') + '>' + t(c[1]) + '</option>';
+    }).join("");
   }
   function switchAchMode(m) {
     achMode = m;
@@ -485,7 +482,7 @@
     closeModals();
     var m = document.getElementById("modal-" + name);
     if (m) m.classList.add("open");
-    if (name === "bestenliste") ladeBestenliste();
+    if (name === "bestenliste") { fuelleLbKategorien(); ladeBestenliste(); }
     if (name === "achievements") ladeAchievements();
     if (name === "eldendex") ladeEldendex();
   }
@@ -600,13 +597,20 @@
     status.classList.remove("hidden"); table.classList.add("hidden");
     status.textContent = window.i18n ? t("lb_loading") : "Lade Bestenliste…";
 
+    var katSel = document.getElementById("lb-kategorie");
+    var lbKategorie = katSel ? katSel.value : "normal";
     var patchSel = document.getElementById("lb-patch");
-    var lbPatch = patchSel ? patchSel.value : "1.4";
+    var lbPatch = patchSel ? patchSel.value : "1.5";
+
+    // Spaltenkopf je Kategorie: Tower zeigt "Akt", sonst "Etappe"
+    var istTower = (lbKategorie === "tower");
+    document.getElementById("th-stage").innerText = istTower ? t("lb_th_akt") : t("lb_th_stage");
+    document.getElementById("th-bosses").innerText = t("lb_th_bosses");
 
     ER.getLeaderboard(20, function (rows, online) {
       if (!rows || rows.length === 0) {
-        status.textContent = online 
-          ? (window.i18n ? t("lb_no_entries_online") : "Noch keine Einträge – sei der Erste!") 
+        status.textContent = online
+          ? (window.i18n ? t("lb_no_entries_online") : "Noch keine Einträge – sei der Erste!")
           : (window.i18n ? t("lb_no_entries_local") : "Noch keine lokalen Läufe. Spiel eine Runde!");
         return;
       }
@@ -623,7 +627,7 @@
         body.appendChild(tr);
       });
       status.classList.add("hidden"); table.classList.remove("hidden");
-    }, lbMode, lbPatch);
+    }, lbKategorie, lbPatch);
   }
 
   /* ===== Achievements ===== */
