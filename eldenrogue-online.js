@@ -361,6 +361,12 @@
       saveStats(s);
       checkAchievements();
       cloudPush();
+      // Neuer Eldendex-Eintrag? -> UI benachrichtigen (Toast)
+      if (typeof window !== "undefined" && typeof window.onERDiscovery === "function") {
+        for (var i = 0; i < ELDENDEX.length; i++) {
+          if (ELDENDEX[i].id === id) { try { window.onERDiscovery(ELDENDEX[i]); } catch (e) {} break; }
+        }
+      }
     },
     getDex: function () {
       var s = getStats();
