@@ -375,6 +375,7 @@ h1, h2, h3, .btn-menu, .btn-combat, .btn-social, .game-author-tag, #region-displ
 
   <div id="death-screen">
     <div class="death-text" id="ui-death-title">DU BIST GESTORBEN</div>
+    <div id="death-tower-result" style="display:none; color:#d4af37; font-family:'Mantinia',serif; font-size:1.1rem; letter-spacing:1px; margin:6px 0 14px; text-align:center;"></div>
     <div class="death-actions">
       <button class="death-btn" id="ui-btn-new-run-death" onclick="direktNeustarten()">🔄 Neuen Run starten</button>
       <a href="index.html" class="death-btn" id="ui-btn-main-menu-death">🏰 Hauptmenü</a>
@@ -551,7 +552,9 @@ let activeChallenge = urlParams.get("challenge") || "";
 // ===== BATTLE TOWER =====
 const TOWER = activeChallenge === "tower";
 const TOWER_EBENEN = 50;          // Gesamtzahl der Ebenen
-let towerFloor = 0;               // aktuelle Ebene (1..50)
+let towerFloor = 0;               // (Legacy, ungenutzt im Akt-System)
+let towerAkt = 1;                 // aktueller Akt (Boss-Rush, endlos aufsteigend)
+let towerBaumKontext = "knoten";  // "knoten" (Baum-Knoten) | "akt" (zwischen den Akten)
 let towerBaseHp = 0;              // Klassen-Basis-HP (für die Skalierung)
 let towerBossBild = "";           // Bild des aktuellen Tower-Gegners
 let towerBonusUpgrade = 0;        // gesammelte Schmiede-Belohnungen (extra Waffenstufen)
@@ -621,7 +624,7 @@ function speichereRun() {
     backpackItems, activeDungeonBuff, dungeonBuffRemainingCombats,
     aktuelleRegion, aktuelleEbene, geloesieKnotenIds, aktuellerKnotenId,
     netzKarte, inSubDungeon, mainMapState,
-    towerFloor, towerBaseHp, towerBonusUpgrade, towerBonusHpPct, towerScherben, towerBonusFlasks, maxKlassenFlasksBasis, towerAktMutator, towerElementTbl, towerAktuellerBoss, towerBossBild, towerTree
+    towerFloor, towerAkt, towerBaseHp, towerBonusUpgrade, towerBonusHpPct, towerScherben, towerBonusFlasks, maxKlassenFlasksBasis, towerAktMutator, towerElementTbl, towerAktuellerBoss, towerBossBild, towerTree
   };
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch(e) {}
 }
@@ -646,12 +649,14 @@ function ladeGespeichertenRun() {
     activeChallenge=d.challenge||"";
     if (activeChallenge === "tower") {
       towerBaseHp=d.towerBaseHp||spielerMaxHp; towerBonusUpgrade=d.towerBonusUpgrade||0; towerBonusHpPct=d.towerBonusHpPct||0;
+      towerAkt=d.towerAkt||1;
       towerScherben=d.towerScherben||0; towerBonusFlasks=d.towerBonusFlasks||0; maxKlassenFlasksBasis=d.maxKlassenFlasksBasis||maxKlassenFlasks;
       maxKlassenFlasks=maxKlassenFlasksBasis+towerBonusFlasks;
       towerAktMutator=d.towerAktMutator||"keiner"; towerElementTbl=d.towerElementTbl||null; towerAktuellerBoss=!!d.towerAktuellerBoss; towerBossBild=d.towerBossBild||"";
       towerTree=Object.assign({ schaerfe:0, henker:0, zaeh:0, stein:0, wendig:0, blut:0 }, d.towerTree||{});
       if (!netzKarte || !netzKarte.length) { starteTowerRun(); return true; }   // Fallback: frischer Lauf
       imKampf=false; aktionsSperre=false;
+      updateChallengeBadge();
       baueKarteHTML(); updateUI();      // zurück auf die Tower-Map
       return true;
     }
@@ -1181,6 +1186,15 @@ function oeffneKlassenAuswahl() {
 function zeigeTodesBildschirm() {
   loescheRunSave();
   if (window.ER) ER.death();
+  let res = document.getElementById("death-tower-result");
+  if (res) {
+    if (TOWER) {
+      if (window.ER && ER.towerReached) ER.towerReached(towerAkt);
+      let best = (window.ER && ER.bestTower) ? ER.bestTower() : towerAkt;
+      res.style.display = "block";
+      res.innerHTML = "🏯 " + t("tower_death_result", { akt: towerAkt }) + '<br><span style="color:#9a8f78; font-size:0.85rem;">' + t("tower_death_best", { n: best }) + "</span>";
+    } else { res.style.display = "none"; }
+  }
   let ds = document.getElementById("death-screen");
   if (ds) ds.classList.add("show");
 }
@@ -1235,7 +1249,7 @@ function waehleKlasseEngine(klasse) {
   else if (klasse === 'samurai') { spielerMaxHp = 110; maxKlassenFlasks = hardMode ? 1 : 2; spielerFlasks = maxKlassenFlasks; basisAusweichChance = 0.40; playerImageStr = "images/starter/tarnished_samurai.webp"; }
   else if (klasse === 'nackt') { spielerMaxHp = 90; maxKlassenFlasks = hardMode ? 0 : 1; spielerFlasks = maxKlassenFlasks; basisAusweichChance = 0.50; playerImageStr = "images/starter/tarnished_nackt.webp"; }
   spielerHp = spielerMaxHp; document.getElementById("popup-content").classList.remove("klassen-modal"); document.getElementById("popup-overlay").style.display = "none";
-  if (window.ER) ER.startRun(hardMode ? "hard" : "normal");
+  if (window.ER && !TOWER) ER.startRun(hardMode ? "hard" : "normal", activeChallenge || (hardMode ? "hard" : "normal"));
   speichereRun();
   if (TOWER) { towerBaseHp = spielerMaxHp; maxKlassenFlasksBasis = maxKlassenFlasks; ausgeruesteteTalismane = []; starteTowerRun(); return; }
   updateUI();
@@ -1878,59 +1892,55 @@ function heileUndRegeneriereVoll(nurHp) {
   if (!nurHp) spielerFlasks = maxKlassenFlasks;
 }
 
-/* ============ BATTLE TOWER ============ */
-// Pool A: nur Bosse, die bereits Bilder im Spiel haben. PCR ist der Endboss auf Ebene 50.
-const TOWER_BOSS_POOL = [
-  { n:"Godrick, der Verpflanzte",                 hp:160, dmg:14, bild:"images/bosse/godrick.webp" },
-  { n:"Sternengeißel Radahn",                     hp:180, dmg:15, bild:"images/bosse/radahn.webp" },
-  { n:"Morgott, der Omenkönig",                   hp:175, dmg:15, bild:"images/bosse/Morgott.webp" },
-  { n:"Feuerriese",                               hp:195, dmg:16, bild:"images/bosse/firegiant.avif" },
-  { n:"Maliketh, die Schwarze Klinge",            hp:185, dmg:16, bild:"images/bosse/maliketh.jpg" },
-  { n:"Gideon Ofnir, der Allwissende",            hp:165, dmg:14, bild:"images/bosse/gideon.webp" },
-  { n:"Godfrey, der Erste Eldenlord",             hp:190, dmg:16, bild:"images/bosse/godfrey.webp" },
-  { n:"Radagon von der Goldenen Ordnung",         hp:195, dmg:16, bild:"images/bosse/radagon.jpg" },
-  { n:"Eldenbiest",                               hp:200, dmg:17, bild:"images/bosse/eldenbeast.jpg" },
-  { n:"Loretta, Knight of the Haligtree",         hp:170, dmg:15, bild:"images/bosse/loretta-knight-of-haligtree.jpg" },
-  { n:"Commander Niall",                          hp:180, dmg:15, bild:"images/bosse/commander-niall-elden-ring-wiki.jpg" },
-  { n:"Malenia, Goddess of Rot",                  hp:200, dmg:17, bild:"images/bosse/malenia-2nd-phase-flying.avif" },
-  { n:"Blaidd, der Halbwolf",                     hp:165, dmg:14, bild:"images/Gegner/blaidd.avif" },
-  { n:"Beastman of Farum Azula",                  hp:150, dmg:13, bild:"images/Gegner/miniboss_beastman.jpg" },
-  { n:"Cleanrot Knight",                          hp:160, dmg:14, bild:"images/Gegner/miniboss_cleanrot_knight.png" },
-  { n:"Omenkiller & Miranda the Blighted Bloom",  hp:165, dmg:14, bild:"images/Gegner/miniboss_omenkiller.jpg" },
-  { n:"Erdtree Avatar",                           hp:170, dmg:15, bild:"images/Gegner/miniboss_erdtree_avatar.webp" },
-  { n:"Dragonkin Soldier",                        hp:180, dmg:15, bild:"images/Gegner/miniboss_dragonkin_soldier.png" }
+/* ============ BATTLE TOWER (Boss-Rush-Aufstieg) ============ */
+// Generische Gegner (nur Name + Bild) – ihre Werte kommen aus einer GLATTEN Formel,
+// damit die Balance konsistent ist (keine Zufalls-Spikes mehr).
+const TOWER_GEGNER = [
+  { n:"Elite-Ritter",          bild:"images/Gegner/soldat.jpg" },
+  { n:"Bloodhound Knight",     bild:"images/Gegner/LIMGRAVE_WAECHTER.webp" },
+  { n:"Banditen-Anführer",     bild:"images/Gegner/LIMGRAVE_INVADER.webp" },
+  { n:"Caelid-Bestie",         bild:"images/Gegner/CAELID_ELITE.jpg" },
+  { n:"Ekzykes-Brut",          bild:"images/Gegner/CAELID_WAECHTER.webp" },
+  { n:"Verseuchter Jäger",     bild:"images/Gegner/CAELID_INVADER.jpg" },
+  { n:"Leyndell-Ritter",       bild:"images/Gegner/LEYNDELL_ELITE.jpg" },
+  { n:"Omen-Krieger",          bild:"images/Gegner/LEYNDELL_WAECHTER.jpg" },
+  { n:"Klingen-Adept",         bild:"images/Gegner/LEYNDELL_INVADER.jpg" },
+  { n:"Feuermönch",            bild:"images/Gegner/MOUNTAINTOPS_ELITE.jpg" },
+  { n:"Berg-Troll",            bild:"images/Gegner/MOUNTAINTOPS_WAECHTER.jpg" },
+  { n:"Wandernder Samurai",    bild:"images/Gegner/MOUNTAINTOPS_INVADER.jpg" },
+  { n:"Bestienmensch",         bild:"images/Gegner/FARUMAZULA_ELITE.jpg" },
+  { n:"Azula-Drache",          bild:"images/Gegner/FARUMAZULA_WAECHTER.jpg" },
+  { n:"Schwarzklingen-Meuchler",bild:"images/Gegner/FARUMAZULA_INVADER.jpg" },
+  { n:"Perfumer-Page",         bild:"images/Gegner/ASHENCAPITAL_ELITE.jpg" },
+  { n:"Königlicher Revenant",  bild:"images/Gegner/ASHENCAPITAL_WAECHTER.jpg" },
+  { n:"Blut-Adept",            bild:"images/Gegner/ASHENCAPITAL_INVADER.jpg" }
 ];
-// Endboss Ebene 50 — Bild bitte als images/bosse/pcr.webp ergaenzen (Fallback: Radahn-Bild).
-const TOWER_ENDBOSS = { n:"Promised Consort Radahn", hp:520, dmg:30, bild:"images/bosse/pcr.webp", fallback:"images/bosse/radahn.webp" };
-
-// Normale Etappen: Gegner & Minibosse (schwaecher als Bosse). Namen = exakte Eldendex-/gegnerName-Strings.
-const TOWER_ENEMY_POOL = [
-  { n:"Elite-Ritter",                 hp:120, dmg:11, bild:"images/Gegner/soldat.jpg" },
-  { n:"Bloodhound Knight",            hp:125, dmg:12, bild:"images/Gegner/LIMGRAVE_WAECHTER.webp" },
-  { n:"Nerijus",                      hp:115, dmg:11, bild:"images/Gegner/LIMGRAVE_INVADER.webp" },
-  { n:"Böser Vogel",                  hp:120, dmg:12, bild:"images/Gegner/CAELID_ELITE.jpg" },
-  { n:"Ekzykes",                      hp:130, dmg:12, bild:"images/Gegner/CAELID_WAECHTER.webp" },
-  { n:"Vyke",                         hp:125, dmg:13, bild:"images/Gegner/CAELID_INVADER.jpg" },
-  { n:"Leyndell Ritter",              hp:125, dmg:12, bild:"images/Gegner/LEYNDELL_ELITE.jpg" },
-  { n:"Omen",                         hp:135, dmg:13, bild:"images/Gegner/LEYNDELL_WAECHTER.jpg" },
-  { n:"Eleonora",                     hp:120, dmg:12, bild:"images/Gegner/LEYNDELL_INVADER.jpg" },
-  { n:"Feuermönch",                   hp:125, dmg:12, bild:"images/Gegner/MOUNTAINTOPS_ELITE.jpg" },
-  { n:"Troll",                        hp:140, dmg:13, bild:"images/Gegner/MOUNTAINTOPS_WAECHTER.jpg" },
-  { n:"Okina",                        hp:120, dmg:12, bild:"images/Gegner/MOUNTAINTOPS_INVADER.jpg" },
-  { n:"Bestienmensch of Farum Azula", hp:130, dmg:13, bild:"images/Gegner/FARUMAZULA_ELITE.jpg" },
-  { n:"Farum Azula Drache",           hp:140, dmg:13, bild:"images/Gegner/FARUMAZULA_WAECHTER.jpg" },
-  { n:"Anastasia",                    hp:125, dmg:13, bild:"images/Gegner/FARUMAZULA_INVADER.jpg" },
-  { n:"Page",                         hp:130, dmg:13, bild:"images/Gegner/ASHENCAPITAL_ELITE.jpg" },
-  { n:"Königlicher Revenant",         hp:135, dmg:13, bild:"images/Gegner/ASHENCAPITAL_WAECHTER.jpg" },
-  { n:"Varre",                        hp:125, dmg:13, bild:"images/Gegner/ASHENCAPITAL_INVADER.jpg" },
-  // Minibosse (etwas staerker)
-  { n:"Beastman of Farum Azula",                  hp:150, dmg:14, bild:"images/Gegner/miniboss_beastman.jpg" },
-  { n:"Cleanrot Knight",                          hp:160, dmg:14, bild:"images/Gegner/miniboss_cleanrot_knight.png" },
-  { n:"Omenkiller & Miranda the Blighted Bloom",  hp:165, dmg:15, bild:"images/Gegner/miniboss_omenkiller.jpg" },
-  { n:"Erdtree Avatar",                           hp:170, dmg:15, bild:"images/Gegner/miniboss_erdtree_avatar.webp" },
-  { n:"Dragonkin Soldier",                        hp:175, dmg:16, bild:"images/Gegner/miniboss_dragonkin_soldier.png" },
-  { n:"Putrid Tree Spirit",                       hp:175, dmg:16, bild:"images/Gegner/putrid_tree_spirit.webp" }
+// Elite-Knoten ziehen aus den Mini-Bossen (stärker, eigenes Bild) – Werte ebenfalls aus der Formel.
+const TOWER_ELITEN = [
+  { n:"Beastman of Farum Azula",   bild:"images/Gegner/miniboss_beastman.jpg" },
+  { n:"Cleanrot Knight",           bild:"images/Gegner/miniboss_cleanrot_knight.png" },
+  { n:"Omenkiller",                bild:"images/Gegner/miniboss_omenkiller.jpg" },
+  { n:"Erdtree Avatar",            bild:"images/Gegner/miniboss_erdtree_avatar.webp" },
+  { n:"Dragonkin Soldier",         bild:"images/Gegner/miniboss_dragonkin_soldier.png" },
+  { n:"Putrid Tree Spirit",        bild:"images/Gegner/putrid_tree_spirit.webp" },
+  { n:"Blaidd, der Halbwolf",      bild:"images/Gegner/blaidd.avif" }
 ];
+// Akt-Bosse = Gauntlet in steigender Schwierigkeit. Akt N -> Index (N-1) % Länge (danach Endlos-Loop).
+const TOWER_AKT_BOSSE = [
+  { n:"Godrick, der Verpflanzte",         bild:"images/bosse/godrick.webp" },
+  { n:"Sternengeißel Radahn",             bild:"images/bosse/radahn.webp" },
+  { n:"Morgott, der Omenkönig",           bild:"images/bosse/Morgott.webp" },
+  { n:"Feuerriese",                       bild:"images/bosse/firegiant.avif" },
+  { n:"Maliketh, die Schwarze Klinge",    bild:"images/bosse/maliketh.jpg" },
+  { n:"Godfrey, der Erste Eldenlord",     bild:"images/bosse/godfrey.webp" },
+  { n:"Malenia, Klinge Miquellas",        bild:"images/bosse/malenia-2nd-phase-flying.avif" },
+  { n:"Radagon von der Goldenen Ordnung", bild:"images/bosse/radagon.jpg" },
+  { n:"Das Eldenbiest",                   bild:"images/bosse/eldenbeast.jpg" },
+  { n:"Promised Consort Radahn",          bild:"images/bosse/pcr.webp", fallback:"images/bosse/radahn.webp" }
+];
+// Basiswerte (für Akt 1, Reihe 1). Alles Weitere skaliert glatt darüber.
+const TOWER_GEGNER_BASIS = { hp: 70, dmg: 8 };
+const TOWER_BOSS_BASIS   = { hp: 210, dmg: 18 };
 
 // ===== TOWER: Etappen-Elemente & Mutatoren =====
 // Jede 5er-Etappe trägt ein "Siegel" (Element). Gegner resistieren ihr Element
@@ -2041,6 +2051,8 @@ function generiereTowerNetz() {
 }
 
 function starteTowerRun() {
+  if (window.ER) ER.startRun("normal", "tower");   // eigener Bestenlisten-Topf "tower"
+  towerAkt = 1;
   towerScherben = 0; towerBonusUpgrade = 0; towerBonusHpPct = 0; towerBonusFlasks = 0;
   towerTree = { schaerfe: 0, henker: 0, zaeh: 0, stein: 0, wendig: 0, blut: 0 };
   towerElementTbl = null; towerAktMutator = "keiner"; towerAktuellerBoss = false;
@@ -2050,36 +2062,64 @@ function starteTowerRun() {
   imKampf = false; inSubDungeon = false; aktionsSperre = false;
   spielerHp = berechneFinalMaxHp(); spielerFlasks = maxKlassenFlasks;
   if (window.ER && ER.towerReached) ER.towerReached(1);
+  updateChallengeBadge();
+  speichereRun(); baueKarteHTML(); updateUI();
+}
+
+// Nächsten Akt starten (frische Map, Spieler wurde bereits voll geheilt)
+function towerStarteAkt() {
+  netzKarte = generiereTowerNetz();
+  aktuelleEbene = 1; geloesieKnotenIds = []; aktuellerKnotenId = null; aktuellerKnotenTyp = 0;
+  imKampf = false; aktionsSperre = false;
+  updateChallengeBadge();
   speichereRun(); baueKarteHTML(); updateUI();
 }
 
 // Klick auf einen Tower-Map-Knoten (aus klickeKnoten heraus aufgerufen)
 function towerKnotenHandler(ebene, knoten) {
-  if (knoten.typ === 7) { oeffneTowerBelohnungPopup(); return; }   // Aufstiegsbaum
-  if (knoten.typ === 12) { towerRastKnoten(ebene); return; }       // Rast: heilen + Scherben
-  towerSetupKampf(knoten.typ, ebene);                              // 3=Kampf, 1=Elite, 5=Boss
+  if (knoten.typ === 7) { towerBaumKontext = "knoten"; oeffneTowerBelohnungPopup(); return; }  // Aufstiegsbaum
+  if (knoten.typ === 12) { towerRastKnoten(ebene); return; }                                    // Rast: heilen + Scherben
+  towerSetupKampf(knoten.typ, ebene);                                                           // 3=Kampf, 1=Elite, 5=Boss
 }
 
-function towerSetupKampf(typ, ebene) {
-  let d = ebene;                                  // Tiefe 1..5
-  let hpMult = 1 + (d - 1) * 0.45, dmgMult = 1 + (d - 1) * 0.30;
+// Glatte Skalierung: wächst pro Akt (stark) und pro Reihe (leicht) – konsistent, keine Spikes.
+function towerGegnerWerte(istElite, reihe) {
+  let aktHp = 1 + (towerAkt - 1) * 0.55, aktDmg = 1 + (towerAkt - 1) * 0.38;
+  let reiheHp = 1 + (reihe - 1) * 0.10, reiheDmg = 1 + (reihe - 1) * 0.07;
+  let eHp = istElite ? 1.7 : 1.0, eDmg = istElite ? 1.35 : 1.0;
+  return {
+    hp:  Math.round(TOWER_GEGNER_BASIS.hp  * aktHp  * reiheHp  * eHp),
+    dmg: Math.round(TOWER_GEGNER_BASIS.dmg * aktDmg * reiheDmg * eDmg)
+  };
+}
+function towerBossWerte() {
+  return {
+    hp:  Math.round(TOWER_BOSS_BASIS.hp  * (1 + (towerAkt - 1) * 0.50)),
+    dmg: Math.round(TOWER_BOSS_BASIS.dmg * (1 + (towerAkt - 1) * 0.35))
+  };
+}
+
+function towerSetupKampf(typ, reihe) {
   let istBoss = (typ === 5), istElite = (typ === 1);
-  let gegner = istBoss ? TOWER_ENDBOSS
-             : (istElite ? TOWER_BOSS_POOL[Math.floor(Math.random() * TOWER_BOSS_POOL.length)]
-                         : TOWER_ENEMY_POOL[Math.floor(Math.random() * TOWER_ENEMY_POOL.length)]);
+  let gegner, werte;
+  if (istBoss) { gegner = TOWER_AKT_BOSSE[(towerAkt - 1) % TOWER_AKT_BOSSE.length]; werte = towerBossWerte(); }
+  else if (istElite) { gegner = TOWER_ELITEN[Math.floor(Math.random() * TOWER_ELITEN.length)]; werte = towerGegnerWerte(true, reihe); }
+  else { gegner = TOWER_GEGNER[Math.floor(Math.random() * TOWER_GEGNER.length)]; werte = towerGegnerWerte(false, reihe); }
+
   towerAktuellerBoss = istBoss;
   towerElementTbl = null;
   towerAktMutator = towerMutatorRollen(istBoss);
 
   gegnerName  = gegner.n;
-  gegnerMaxHp = istBoss ? gegner.hp : Math.round(gegner.hp * hpMult * (istElite ? 1.30 : 1));
+  gegnerMaxHp = werte.hp;
   if (towerAktMutator === "gier") gegnerMaxHp = Math.round(gegnerMaxHp * 1.40);
   gegnerHp = gegnerMaxHp;
-  gegnerSchaden = istBoss ? Math.round(gegner.dmg * 1.6) : Math.round(gegner.dmg * dmgMult * (istElite ? 1.20 : 1));
+  gegnerSchaden = werte.dmg;
   towerBossBild = gegner.bild;
 
-  waffenUpgrade    = 2 + (d - 1) * 2 + towerBonusUpgrade + towerTreeWeaponBonus();
-  spielerMaxHp     = Math.round(towerBaseHp * (1 + (d - 1) * 0.15 + towerBonusHpPct + towerTreeHpPct()));
+  // Spieler skaliert leicht mit dem Akt mit – der Skill-Baum ist der entscheidende Hebel.
+  waffenUpgrade    = 3 + (towerAkt - 1) * 3 + (reihe - 1) + towerBonusUpgrade + towerTreeWeaponBonus();
+  spielerMaxHp     = Math.round(towerBaseHp * (1 + (towerAkt - 1) * 0.18 + towerBonusHpPct + towerTreeHpPct()));
   maxKlassenFlasks = maxKlassenFlasksBasis + towerBonusFlasks;
   let neuMax = berechneFinalMaxHp();
   spielerHp = Math.min(spielerHp <= 0 ? neuMax : spielerHp, neuMax);   // HP wird übernommen (Attrition)
@@ -2091,34 +2131,46 @@ function towerSetupKampf(typ, ebene) {
   document.getElementById("arena-enemy-name").innerText = gegnerNameLoc(gegnerName);
   let tag = istBoss ? "👑 " : (istElite ? "⚔️ " : "🗡️ ");
   let mutTxt = towerAktMutator !== "keiner" ? "  ⚙️ " + towerMutName(towerAktMutator) : "";
-  document.getElementById("battle-log").innerText = tag + gegnerNameLoc(gegnerName) + "!" + mutTxt;
+  document.getElementById("battle-log").innerText = tag + t("tower_akt", { n: towerAkt }) + " · " + gegnerNameLoc(gegnerName) + "!" + mutTxt;
   speichereRun(); updateUI();
 }
 
 // Rast/Bonus-Knoten: volle Heilung + Flakons + Turmscherben, dann weiter zur nächsten Reihe
 function towerRastKnoten(ebene) {
   spielerHp = berechneFinalMaxHp(); spielerFlasks = maxKlassenFlasks;
-  let bonus = 30 + ebene * 6; towerScherben += bonus;
+  let bonus = 25 + towerAkt * 8 + ebene * 3; towerScherben += bonus;
   oeffneStatPopup("🏕️ " + t("tower_rest_title"), t("tower_rest_desc", { n: bonus }), ebene + 1);
 }
 
 function towerSiegBehandeln() {
   if (window.ER) { ER.fightWon(); if (towerAktuellerBoss) ER.bossKilled(gegnerName); }
-  let basis = towerAktuellerBoss ? 60 : (aktuellerKnotenTyp === 1 ? 28 : 16);
-  let gewinn = Math.round(basis + aktuelleEbene * 4);
+  let basis = towerAktuellerBoss ? 70 : (aktuellerKnotenTyp === 1 ? 30 : 16);
+  let gewinn = Math.round(basis + towerAkt * 6 + aktuelleEbene * 3);
   if (towerAktMutator === "gier") gewinn *= 2;
   towerScherben += gewinn;
 
-  if (towerAktuellerBoss) {                         // Boss besiegt -> Tower geschafft
-    imKampf = false;
-    if (window.ER) { ER.gameCompleted(); if (activeChallenge) ER.challengeCompleted(activeChallenge); }
-    oeffneAbschlussPopup(t("tower_win_title"), t("tower_win_desc"));
-    return;
-  }
+  if (towerAktuellerBoss) { towerAktAbschluss(); return; }   // Akt-Boss besiegt -> Aufstieg
   imKampf = false; aktionsSperre = false;
-  aktuelleEbene = aktuelleEbene + 1;                // nächste Reihe -> Map zeigt die verbundenen Knoten
-  if (window.ER && ER.towerReached) ER.towerReached(aktuelleEbene);
+  aktuelleEbene = aktuelleEbene + 1;                          // nächste Reihe -> Map zeigt die verbundenen Knoten
   speichereRun(); baueKarteHTML(); updateUI();
+}
+
+// Akt-Boss besiegt: Bonus-Scherben, voll heilen, in den nächsten (härteren) Akt aufsteigen.
+function towerAktAbschluss() {
+  imKampf = false; aktionsSperre = false;
+  towerScherben += 40 + towerAkt * 10;
+  if (window.ER && ER.towerReached) ER.towerReached(towerAkt);
+  // Komplettes Gauntlet (alle Akt-Bosse) erstmals geschafft -> Challenge abgeschlossen
+  if (towerAkt >= TOWER_AKT_BOSSE.length && window.ER && ER.challengeCompleted) ER.challengeCompleted("tower");
+  towerAkt++;
+  spielerMaxHp = Math.round(towerBaseHp * (1 + (towerAkt - 1) * 0.18 + towerBonusHpPct + towerTreeHpPct()));
+  maxKlassenFlasks = maxKlassenFlasksBasis + towerBonusFlasks;
+  spielerHp = berechneFinalMaxHp(); spielerFlasks = maxKlassenFlasks;
+  if (window.ER && ER.towerReached) ER.towerReached(towerAkt);
+  updateChallengeBadge();
+  towerBaumKontext = "akt";
+  speichereRun();
+  oeffneTowerBelohnungPopup();   // Power-Up zwischen den Akten: Scherben im Baum ausgeben, dann weiter
 }
 
 // ===== Aufstiegsbaum zwischen den Ebenen =====
@@ -2146,14 +2198,26 @@ function oeffneTowerBelohnungPopup() {
     let nodes = TOWER_TREE.filter(n => n.branch === b).map(towerBaumKnotenHtml).join("");
     return '<div style="flex:1; min-width:148px;"><div style="font-family:\'Mantinia\',serif; font-size:0.8rem; letter-spacing:1px; text-transform:uppercase; color:#cdbfa3; text-align:center; margin-bottom:5px;">' + t(TOWER_BRANCH_NAME[b]) + '</div>' + nodes + '</div>';
   }).join("");
+  let zwischenAkt = (towerBaumKontext === "akt");
+  let header, weiterLabel, vorschau = "";
+  if (zwischenAkt) {
+    header = '<h3 style="color:#ffd24a; font-size:1.5rem; margin-top:0; letter-spacing:2px; font-family:\'Mantinia\', serif;">🏆 ' + t("tower_akt_done", { n: towerAkt - 1 }) + '</h3>';
+    weiterLabel = t("tower_next_akt", { n: towerAkt });
+    let nb = TOWER_AKT_BOSSE[(towerAkt - 1) % TOWER_AKT_BOSSE.length];
+    vorschau = '<p style="color:#e74c3c; font-size:0.82rem; font-family:sans-serif; margin:2px 0 6px;">⚔️ ' + t("tower_next_boss", { boss: gegnerNameLoc(nb.n) }) + '</p>';
+  } else {
+    header = '<h3 style="color:#d4af37; font-size:1.4rem; margin-top:0; letter-spacing:2px; font-family:\'Mantinia\', serif;">🌿 ' + t("tower_tree_title") + '</h3>';
+    weiterLabel = t("tower_tree_continue");
+  }
   content.innerHTML =
-    '<h3 style="color:#d4af37; font-size:1.4rem; margin-top:0; letter-spacing:2px; font-family:\'Mantinia\', serif;">🌿 ' + t("tower_tree_title") + '</h3>' +
+    header +
     '<p style="color:#d4af37; font-size:0.95rem; font-family:sans-serif; margin:2px 0 4px; font-weight:bold;">🔹 ' + towerScherben + ' ' + t("tower_shards") + '</p>' +
+    vorschau +
     '<p style="color:#9aa0a6; font-size:0.8rem; font-family:sans-serif; margin:6px 0 10px;">' + t("tower_tree_pick") + '</p>' +
     '<div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center;">' + cols + '</div>' +
     '<div style="display:flex; gap:8px; margin-top:10px;">' +
       '<button class="btn-modal-action" style="margin:0; flex:1; border-color:#b97cff; color:#c9a3ff;" onclick="towerKaufTalisman()">💍 ' + t("tower_reward_talisman") + ' <span style="color:#d4af37;">75🔹</span></button>' +
-      '<button class="btn-modal-action" style="margin:0; flex:1; border-color:#2ecc71; color:#2ecc71;" onclick="towerBaumFertig()">' + t("tower_tree_continue") + '</button>' +
+      '<button class="btn-modal-action" style="margin:0; flex:1; border-color:#2ecc71; color:#2ecc71;" onclick="towerBaumFertig()">' + weiterLabel + '</button>' +
     '</div>';
   overlay.style.display = "flex";
 }
@@ -2179,7 +2243,8 @@ function towerKaufTalisman() {
 
 function towerBaumFertig() {
   document.getElementById("popup-overlay").style.display = "none";
-  aktuelleEbene = aktuelleEbene + 1;        // Aufstiegsbaum-Knoten abgeschlossen -> nächste Reihe
+  if (towerBaumKontext === "akt") { towerStarteAkt(); return; }   // zwischen den Akten -> neuer Akt
+  aktuelleEbene = aktuelleEbene + 1;                              // Baum-Knoten abgeschlossen -> nächste Reihe
   speichereRun(); baueKarteHTML(); updateUI();
 }
 
@@ -2530,6 +2595,7 @@ function updateChallengeBadge() {
   if (!badge) return;
   if (activeChallenge) {
     badge.style.display = "block";
+    if (activeChallenge === "tower") { badge.innerText = "🏯 " + t("tower_akt", { n: towerAkt }); return; }
     let labels = { noarmor: "🛡️ NO ARMOR", noblaidd: "🐺 NO BLAIDD", autobattle: "⚡ AUTO-BATTLE", haligtree: "🌳 HALIGTREE" };
     badge.innerText = labels[activeChallenge] || ("🏴 " + activeChallenge.toUpperCase());
   } else { badge.style.display = "none"; }
