@@ -508,7 +508,7 @@ h1, h2, h3, .btn-menu, .btn-combat, .btn-social, .game-author-tag, #region-displ
             <span id="arena-enemy-hp-text" class="bar-text-overlay">40 / 40</span>
           </div>
           <div class="combat-sprite-frame">
-            <img id="enemy-img" src="" alt="Gegner">
+            <img id="enemy-img" src="" alt="Gegner" onload="this.style.display='block'" onerror="this.style.display='none'">
           </div>
         </div>
       </div>
@@ -548,7 +548,15 @@ const TOWER = activeChallenge === "tower";
 const TOWER_EBENEN = 50;          // Gesamtzahl der Ebenen
 let towerFloor = 0;               // aktuelle Ebene (1..50)
 let towerBaseHp = 0;              // Klassen-Basis-HP (für die Skalierung)
-let towerBossBild = "";           // Bild des aktuellen Tower-Bosses
+let towerBossBild = "";           // Bild des aktuellen Tower-Gegners
+let towerBonusUpgrade = 0;        // gesammelte Schmiede-Belohnungen (extra Waffenstufen)
+let towerBonusHpPct = 0;          // gesammelte Lebenskraft-Belohnungen (extra max HP %)
+let towerAktuellerBoss = false;   // ist die aktuelle Ebene ein Boss?
+let towerScherben = 0;            // Turm-Währung für den Schmiede-Shop
+let towerBonusFlasks = 0;         // im Shop dauerhaft gekaufte Extra-Flakons
+let towerAktMutator = "keiner";   // aktiver Mutator dieser Ebene
+let towerElementTbl = null;       // Resistenz-/Schwächen-Tabelle der aktuellen Etappe
+let maxKlassenFlasksBasis = 3;    // Flakon-Grundwert der Klasse (für Shop-Upgrades im Turm)
 
 // ===== TEST-/DEBUG-MODUS: 9999 Schaden pro Treffer =====
 // Aktivierung über die URL, z.B.:  game.html?debug=1   oder kombiniert:  game.html?challenge=haligtree&debug=1
@@ -607,7 +615,8 @@ function speichereRun() {
     questProgress, medallionHalves, fortressPlacedRegions, fortressRegionsPlan, currentAffinity, affinityHits, completedDungeonsCount,
     backpackItems, activeDungeonBuff, dungeonBuffRemainingCombats,
     aktuelleRegion, aktuelleEbene, geloesieKnotenIds, aktuellerKnotenId,
-    netzKarte, inSubDungeon, mainMapState
+    netzKarte, inSubDungeon, mainMapState,
+    towerFloor, towerBaseHp, towerBonusUpgrade, towerBonusHpPct, towerScherben, towerBonusFlasks, maxKlassenFlasksBasis, towerAktMutator, towerElementTbl, towerAktuellerBoss, towerBossBild
   };
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch(e) {}
 }
@@ -630,6 +639,13 @@ function ladeGespeichertenRun() {
     aktuelleRegion=d.aktuelleRegion; aktuelleEbene=d.aktuelleEbene; geloesieKnotenIds=d.geloesieKnotenIds||[]; aktuellerKnotenId=d.aktuellerKnotenId;
     netzKarte=d.netzKarte||[]; inSubDungeon=d.inSubDungeon; mainMapState=d.mainMapState;
     activeChallenge=d.challenge||"";
+    if (activeChallenge === "tower") {
+      towerFloor=d.towerFloor||1; towerBaseHp=d.towerBaseHp||spielerMaxHp; towerBonusUpgrade=d.towerBonusUpgrade||0; towerBonusHpPct=d.towerBonusHpPct||0;
+      towerScherben=d.towerScherben||0; towerBonusFlasks=d.towerBonusFlasks||0; maxKlassenFlasksBasis=d.maxKlassenFlasksBasis||maxKlassenFlasks;
+      towerAktMutator=d.towerAktMutator||"keiner"; towerElementTbl=d.towerElementTbl||null; towerAktuellerBoss=!!d.towerAktuellerBoss; towerBossBild=d.towerBossBild||"";
+      starteTowerFloor();
+      return true;
+    }
     baueKarteHTML(); updateUI();
     return true;
   } catch(e) { return false; }
@@ -783,7 +799,7 @@ function rolleZufallsWaffe() {
   return waffe;
 }
 
-function setzeAusgeruesteteWaffe(w) { waffenName = w.name; waffenSchaden = w.basisDmg; waffenRaritaet = w.rarity || "common"; waffenSchadensarten = w.schadensarten ? [...w.schadensarten] : ["Normal"]; }
+function setzeAusgeruesteteWaffe(w) { waffenName = w.name; waffenSchaden = w.basisDmg; waffenRaritaet = w.rarity || "common"; waffenSchadensarten = w.schadensarten ? [...w.schadensarten] : ["Normal"]; if (window.ER && w.name) ER.discover("w:" + w.name); }
 function gibAusgeruesteteWaffe() { return { name: waffenName, basisDmg: waffenSchaden, rarity: waffenRaritaet, schadensarten: [...waffenSchadensarten] }; }
 
 const bossResistenzen = {
@@ -801,6 +817,14 @@ const bossResistenzen = {
 };
 
 function gibBossSchadensModifikator() {
+  if (TOWER) {
+    if (!towerElementTbl) return 0;
+    let best = null;
+    waffenSchadensarten.forEach(art => { if (towerElementTbl[art] !== undefined && (best === null || towerElementTbl[art] > best)) best = towerElementTbl[art]; });
+    let mod = best === null ? 0 : best;
+    if (towerAktMutator === "eisenhaut") mod -= 0.25;  // Eisenhaut: 25% weniger Schaden von dir
+    return mod;
+  }
   if (inSubDungeon || aktuellerKnotenTyp !== 5) return 0;
   let tbl = bossResistenzen[gegnerName]; if (!tbl) return 0;
   let best = null;
@@ -809,8 +833,10 @@ function gibBossSchadensModifikator() {
 }
 
 function gibGegnerAffinitaeten() {
-  if (inSubDungeon || aktuellerKnotenTyp !== 5) return null;
-  let tbl = bossResistenzen[gegnerName]; if (!tbl) return null;
+  let tbl = null;
+  if (TOWER) tbl = towerElementTbl;
+  else if (!inSubDungeon && aktuellerKnotenTyp === 5) tbl = bossResistenzen[gegnerName];
+  if (!tbl) return null;
   let schwaechen = [], resistenzen = [];
   schadensArten.forEach(art => { if (tbl[art] > 0) schwaechen.push(art); else if (tbl[art] < 0) resistenzen.push(art); });
   if (schwaechen.length === 0 && resistenzen.length === 0) return null;
@@ -888,7 +914,7 @@ function rolleZufallsRuestung(){
   let pool = ruestungDatenbank[rarity]; let base = pool[Math.floor(Math.random()*pool.length)];
   return { name: base.name, bild: base.bild, rarity: rarity, reduktion: ruestungRaritaetReduktion[rarity] };
 }
-function setzeAusgeruesteteRuestung(r){ ruestungName=r.name; ruestungRaritaet=r.rarity; ruestungReduktion=r.reduktion; ruestungBild=r.bild; }
+function setzeAusgeruesteteRuestung(r){ ruestungName=r.name; ruestungRaritaet=r.rarity; ruestungReduktion=r.reduktion; ruestungBild=r.bild; if (window.ER && r.name) ER.discover("a:" + r.name); }
 function gibAusgeruesteteRuestung(){ return { name:ruestungName, rarity:ruestungRaritaet, reduktion:ruestungReduktion, bild:ruestungBild }; }
 function hatRuestungAusgeruestet(){ return ruestungReduktion > 0 || ruestungName !== t("no_armor"); }
 
@@ -1188,7 +1214,7 @@ function waehleKlasseEngine(klasse) {
   spielerHp = spielerMaxHp; document.getElementById("popup-content").classList.remove("klassen-modal"); document.getElementById("popup-overlay").style.display = "none";
   if (window.ER) ER.startRun(hardMode ? "hard" : "normal");
   speichereRun();
-  if (TOWER) { towerFloor = 1; towerBaseHp = spielerMaxHp; starteTowerFloor(); return; }
+  if (TOWER) { towerFloor = 1; towerBaseHp = spielerMaxHp; towerBonusUpgrade = 0; towerBonusHpPct = 0; towerScherben = 0; towerBonusFlasks = 0; maxKlassenFlasksBasis = maxKlassenFlasks; ausgeruesteteTalismane = []; starteTowerFloor(); return; }
   updateUI();
 }
 
@@ -1345,7 +1371,12 @@ function updateUI() {
   document.getElementById("player-dodge-text").innerHTML = `${t("dodge_roll")} <b>${Math.round(finaleAusweichChance * 100)}%</b>`;
 
   let rFarbe = raritaetFarben[waffenRaritaet] || "#9aa0a6";
-  let wImg = document.getElementById("weapon-img"); wImg.style.display = "block"; wImg.src = gibWaffenBild(waffenName);
+  let wImg = document.getElementById("weapon-img"); let wBild = gibWaffenBild(waffenName);
+  if (wImg.getAttribute("src") !== wBild) {            // nur neu laden, wenn sich die Waffe wirklich ändert (kein Flackern)
+    wImg.onload = function () { this.style.display = "block"; };
+    wImg.onerror = function () { this.style.display = "none"; };
+    wImg.src = wBild;
+  }
   document.getElementById("weapon-img-box").style.borderColor = rFarbe;
   document.getElementById("player-weapon").innerHTML = `<span style="color:${rFarbe}; font-weight:bold;">${waffenNameLoc(waffenName)}</span> <span style="color:#888;">+${waffenUpgrade}</span>`;
   document.getElementById("player-weapon-dmg").innerText = t("weapon_damage_label", { dmg: finalDmg });
@@ -1420,6 +1451,7 @@ function updateUI() {
     document.getElementById("enemy-hp-bar").max = gegnerMaxHp; document.getElementById("enemy-hp-bar").value = gegnerHp;
     document.getElementById("arena-enemy-hp-text").innerText = `${gegnerHp} / ${gegnerMaxHp}`;
     document.getElementById("arena-enemy-name").innerText = gegnerNameLoc(gegnerName); 
+    if (window.ER && gegnerName) ER.discover(gegnerName); // Eldendex: Gegner/Boss entdeckt
     
     document.getElementById("enemy-stagger-badge").style.display = (enemyIsStaggered || staggerVisualActive) ? "block" : "none";
     document.getElementById("enemy-sprite-wrapper").classList.toggle("staggered", enemyIsStaggered || staggerVisualActive);
@@ -1429,7 +1461,10 @@ function updateUI() {
       let teile = [];
       if (aff.schwaechen.length) teile.push(`<span style="color:#2ecc71; font-weight:bold;">▲ ${t("combat_weakness")}: ${aff.schwaechen.map(a => t("dmg_" + a.toLowerCase())).join(", ")}</span>`);
       if (aff.resistenzen.length) teile.push(`<span style="color:#e67e22; font-weight:bold;">▼ ${t("combat_resistance")}: ${aff.resistenzen.map(a => t("dmg_" + a.toLowerCase())).join(", ")}</span>`);
+      if (TOWER && towerAktMutator !== "keiner") teile.push(`<span style="color:#c39bd3; font-weight:bold;">⚙️ ${towerMutName(towerAktMutator)}</span> <span style="color:#9aa0a6;">— ${towerMutDesc(towerAktMutator)}</span>`);
       affInfo.innerHTML = teile.join("<br>"); affInfo.style.display = "block";
+    } else if (TOWER && towerAktMutator !== "keiner") {
+      affInfo.innerHTML = `<span style="color:#c39bd3; font-weight:bold;">⚙️ ${towerMutName(towerAktMutator)}</span> <span style="color:#9aa0a6;">— ${towerMutDesc(towerAktMutator)}</span>`; affInfo.style.display = "block";
     } else { affInfo.style.display = "none"; }
 
     if (TOWER) document.getElementById("enemy-img").src = towerBossBild || "";
@@ -1456,8 +1491,8 @@ function updateUI() {
 
     document.getElementById("player-combat-img").src = playerImageStr;
     document.getElementById("atk-btn").disabled = aktionsSperre;
-    document.getElementById("heal-btn").disabled = aktionsSperre || spielerFlasks <= 0;
-    document.getElementById("heal-btn").innerHTML = `🧪 ${t("btn_heal")} (${spielerFlasks})`;
+    document.getElementById("heal-btn").disabled = aktionsSperre || spielerFlasks <= 0 || (TOWER && towerAktMutator === "versiegelt");
+    document.getElementById("heal-btn").innerHTML = (TOWER && towerAktMutator === "versiegelt") ? `🔒 ${t("btn_heal")}` : `🧪 ${t("btn_heal")} (${spielerFlasks})`;
   } else { 
     document.getElementById("battle-view").style.display = "none"; document.getElementById("map-view").style.display = "flex"; document.getElementById("atk-btn").style.display = ""; document.getElementById("heal-btn").style.display = ""; baueKarteHTML();
   }
@@ -1496,10 +1531,11 @@ function klickeKnoten(ebene, knoten) {
   if (knoten.typ === 12) { looteDungeonChest(ebene + 1); return; }
   if (knoten.typ === 13) { triggerDungeonRun(ebene + 1); return; }
 
-  let rMult = (hardMode ? 1.35 : 1.05) * 1.05; if (aktuelleRegion === "Caelid") rMult = (hardMode ? 1.7*1.3 : 1.7) * 1.05; if (aktuelleRegion === "Leyndell") rMult = (hardMode ? 2.4*1.3 : 2.4) * 1.05; 
-  if (aktuelleRegion === "Mountaintops") rMult = (hardMode ? 3.2*1.3 : 3.2) * 1.05; if (aktuelleRegion === "FarumAzula") rMult = (hardMode ? 4.0*1.3 : 4.0) * 1.05;
-  if (aktuelleRegion === "AshenCapital") rMult = (hardMode ? 4.8*1.3 : 4.8) * 1.05; if (aktuelleRegion === "EldenThrone") rMult = (hardMode ? 5.5*1.3 : 5.5) * 1.05;
-  if (aktuelleRegion === "Haligtree") rMult = (hardMode ? 6.5*1.3 : 6.5) * 1.05;
+  // Regions-Skalierung: Normal-Basiswert je Region (Limgrave gesondert), Hard = Basis * 1.3.
+  // Globaler Faktor: Hard *1.05 (unverändert), Normal *0.92 -> Normalmodus etwas einfacher.
+  const REGION_SCALE = { Limgrave: 1.05, Caelid: 1.7, Leyndell: 2.4, Mountaintops: 3.2, FarumAzula: 4.0, AshenCapital: 4.8, EldenThrone: 5.5, Haligtree: 6.5 };
+  let regionBasis = REGION_SCALE[aktuelleRegion] || 1.05;
+  let rMult = (hardMode ? (aktuelleRegion === "Limgrave" ? 1.35 : regionBasis * 1.3) : regionBasis) * (hardMode ? 1.05 : 0.92);
 
   if (gebietsGegnerKonfig[aktuelleRegion]) {
     let cfg = gebietsGegnerKonfig[aktuelleRegion];
@@ -1511,7 +1547,7 @@ function klickeKnoten(ebene, knoten) {
   if (knoten.typ === 11) { gegnerName = "Dungeon Skelett"; gegnerMaxHp = Math.round(25 * rMult); gegnerSchaden = Math.round(5 * rMult); }
   else if (knoten.typ === 9) {
     if (activeChallenge === "noblaidd") { oeffneStatPopup(t("challenge_noblaidd_skip_title"), t("challenge_noblaidd_skip_desc"), ebene + 1); return; }
-    gegnerName = "Blaidd, der Halbwolf"; let bScale = 1 + questProgress * (hardMode ? 0.75 : 0.5); gegnerMaxHp = Math.round(80 * rMult * bScale); gegnerSchaden = Math.round(15 * rMult * bScale); }
+    gegnerName = "Blaidd, der Halbwolf"; let bScale = 1 + questProgress * (hardMode ? 0.75 : 0.35); gegnerMaxHp = Math.round(80 * rMult * bScale); gegnerSchaden = Math.round(15 * rMult * bScale); }
   else if (knoten.typ === 15) {
     // Festungskampf (Haligtree Challenge) — wie ein normaler Kampf
     if (medallionHalves === 0) { gegnerName = "Loretta, Knight of the Haligtree"; gegnerMaxHp = Math.round(280 * rMult); gegnerSchaden = Math.round(35 * rMult); }
@@ -1723,10 +1759,16 @@ function spielerAngriff() {
 
   let schaden = DEBUG_DMG ? 9999 : (finalDmg + Math.floor(Math.random() * 5) - 2);
   gegnerHp = Math.max(0, gegnerHp - schaden);
+  if (TOWER && towerAktMutator === "aderlass" && schaden > 0) {   // Aderlass: 6% Lifesteal
+    let geheilt = Math.max(1, Math.round(schaden * 0.06)), fmax = berechneFinalMaxHp();
+    if (spielerHp < fmax) { spielerHp = Math.min(fmax, spielerHp + geheilt); zeigeFloatingZahl(playerWrapper, "+" + geheilt, "dmg-heal"); }
+  }
 
   if (gegnerHp > 0) {
     playerHitsOnEnemy++;
-    if (playerHitsOnEnemy === (hardMode ? 5 : 4)) { enemyIsStaggered = true; staggerVisualActive = true; nextHitBonusDamage = true; playerHitsOnEnemy = 0; }
+    let staggerSchwelle = hardMode ? 5 : 4;
+    if (TOWER && towerAktMutator === "zerbrechlich") staggerSchwelle = hardMode ? 4 : 3;
+    if (playerHitsOnEnemy === staggerSchwelle) { enemyIsStaggered = true; staggerVisualActive = true; nextHitBonusDamage = true; playerHitsOnEnemy = 0; }
   }
 
   setTimeout(() => { 
@@ -1757,7 +1799,7 @@ function spielerAngriff() {
       enemyWrapper.style.transform = "translateX(0)";
       if (ausgewichen) { playerWrapper.classList.add("player-rolling"); zeigeFloatingZahl(playerWrapper, t("float_dodged"), "dmg-dodge"); document.getElementById("battle-log").innerText += t("roll_success"); updateUI(); } 
       else {
-        let gSchaden = gegnerSchaden + Math.floor(Math.random() * 4) - 1; gSchaden = Math.round(gSchaden * (1 + tStats.bonusDmgTakenPercent) * (1 - ruestungReduktion)); gSchaden = Math.max(1, gSchaden);
+        let gSchaden = gegnerSchaden + Math.floor(Math.random() * 4) - 1; gSchaden = Math.round(gSchaden * (1 + tStats.bonusDmgTakenPercent) * (1 - ruestungReduktion) * (TOWER ? towerGegnerDmgMult() : 1)); gSchaden = Math.max(1, gSchaden);
         spielerHp = Math.max(0, spielerHp - gSchaden); playerWrapper.classList.add("enemy-hurt"); zeigeFloatingZahl(playerWrapper, "-" + gSchaden, "dmg-enemy");
         document.getElementById("battle-log").innerText += t("roll_fail", { name: gegnerNameLoc(gegnerName), dmg: gSchaden }); updateUI();
       }
@@ -1768,6 +1810,7 @@ function spielerAngriff() {
 
 function spielerHeilen() {
   if (!imKampf || spielerHp <= 0 || aktionsSperre) return;
+  if (TOWER && towerAktMutator === "versiegelt") { document.getElementById("battle-log").innerText = "🔒 " + towerMutName("versiegelt") + " — " + towerMutDesc("versiegelt"); return; }
   if (spielerFlasks > 0) {
     aktionsSperre = true;
     let tStats = berechneTalismanStats();
@@ -1792,7 +1835,7 @@ function spielerHeilen() {
 
       if (ausgewichen) { playerWrapper.classList.add("player-rolling"); zeigeFloatingZahl(playerWrapper, t("float_dodged"), "dmg-dodge"); document.getElementById("battle-log").innerText += t("heal_roll_success"); updateUI(); } 
       else {
-        let gSchaden = gegnerSchaden + Math.floor(Math.random() * 3); gSchaden = Math.round(gSchaden * (1 + tStats.bonusDmgTakenPercent) * (1 - ruestungReduktion));
+        let gSchaden = gegnerSchaden + Math.floor(Math.random() * 3); gSchaden = Math.round(gSchaden * (1 + tStats.bonusDmgTakenPercent) * (1 - ruestungReduktion) * (TOWER ? towerGegnerDmgMult() : 1));
         gSchaden = Math.max(1, gSchaden); spielerHp = Math.max(0, spielerHp - gSchaden);
         playerWrapper.classList.add("enemy-hurt"); zeigeFloatingZahl(playerWrapper, "-" + gSchaden, "dmg-enemy"); document.getElementById("battle-log").innerText += t("heal_roll_fail", { name: gegnerNameLoc(gegnerName), dmg: gSchaden }); updateUI();
       }
@@ -1831,58 +1874,236 @@ const TOWER_BOSS_POOL = [
 // Endboss Ebene 50 — Bild bitte als images/bosse/pcr.webp ergaenzen (Fallback: Radahn-Bild).
 const TOWER_ENDBOSS = { n:"Promised Consort Radahn", hp:520, dmg:30, bild:"images/bosse/pcr.webp", fallback:"images/bosse/radahn.webp" };
 
+// Normale Etappen: Gegner & Minibosse (schwaecher als Bosse). Namen = exakte Eldendex-/gegnerName-Strings.
+const TOWER_ENEMY_POOL = [
+  { n:"Elite-Ritter",                 hp:120, dmg:11, bild:"images/Gegner/soldat.jpg" },
+  { n:"Bloodhound Knight",            hp:125, dmg:12, bild:"images/Gegner/LIMGRAVE_WAECHTER.webp" },
+  { n:"Nerijus",                      hp:115, dmg:11, bild:"images/Gegner/LIMGRAVE_INVADER.webp" },
+  { n:"Böser Vogel",                  hp:120, dmg:12, bild:"images/Gegner/CAELID_ELITE.jpg" },
+  { n:"Ekzykes",                      hp:130, dmg:12, bild:"images/Gegner/CAELID_WAECHTER.webp" },
+  { n:"Vyke",                         hp:125, dmg:13, bild:"images/Gegner/CAELID_INVADER.jpg" },
+  { n:"Leyndell Ritter",              hp:125, dmg:12, bild:"images/Gegner/LEYNDELL_ELITE.jpg" },
+  { n:"Omen",                         hp:135, dmg:13, bild:"images/Gegner/LEYNDELL_WAECHTER.jpg" },
+  { n:"Eleonora",                     hp:120, dmg:12, bild:"images/Gegner/LEYNDELL_INVADER.jpg" },
+  { n:"Feuermönch",                   hp:125, dmg:12, bild:"images/Gegner/MOUNTAINTOPS_ELITE.jpg" },
+  { n:"Troll",                        hp:140, dmg:13, bild:"images/Gegner/MOUNTAINTOPS_WAECHTER.jpg" },
+  { n:"Okina",                        hp:120, dmg:12, bild:"images/Gegner/MOUNTAINTOPS_INVADER.jpg" },
+  { n:"Bestienmensch of Farum Azula", hp:130, dmg:13, bild:"images/Gegner/FARUMAZULA_ELITE.jpg" },
+  { n:"Farum Azula Drache",           hp:140, dmg:13, bild:"images/Gegner/FARUMAZULA_WAECHTER.jpg" },
+  { n:"Anastasia",                    hp:125, dmg:13, bild:"images/Gegner/FARUMAZULA_INVADER.jpg" },
+  { n:"Page",                         hp:130, dmg:13, bild:"images/Gegner/ASHENCAPITAL_ELITE.jpg" },
+  { n:"Königlicher Revenant",         hp:135, dmg:13, bild:"images/Gegner/ASHENCAPITAL_WAECHTER.jpg" },
+  { n:"Varre",                        hp:125, dmg:13, bild:"images/Gegner/ASHENCAPITAL_INVADER.jpg" },
+  // Minibosse (etwas staerker)
+  { n:"Beastman of Farum Azula",                  hp:150, dmg:14, bild:"images/Gegner/miniboss_beastman.jpg" },
+  { n:"Cleanrot Knight",                          hp:160, dmg:14, bild:"images/Gegner/miniboss_cleanrot_knight.png" },
+  { n:"Omenkiller & Miranda the Blighted Bloom",  hp:165, dmg:15, bild:"images/Gegner/miniboss_omenkiller.jpg" },
+  { n:"Erdtree Avatar",                           hp:170, dmg:15, bild:"images/Gegner/miniboss_erdtree_avatar.webp" },
+  { n:"Dragonkin Soldier",                        hp:175, dmg:16, bild:"images/Gegner/miniboss_dragonkin_soldier.png" },
+  { n:"Putrid Tree Spirit",                       hp:175, dmg:16, bild:"images/Gegner/putrid_tree_spirit.webp" }
+];
+
+// ===== TOWER: Etappen-Elemente & Mutatoren =====
+// Jede 5er-Etappe trägt ein "Siegel" (Element). Gegner resistieren ihr Element
+// und sind schwach gegen das Konter-Element -> belohnt Anpassung der Schadensart.
+const TOWER_STAGE_ELEMENTE = [
+  { el:"Feuer",  konter:"Magie"  },
+  { el:"Magie",  konter:"Feuer"  },
+  { el:"Heilig", konter:"Normal" },
+  { el:"Normal", konter:"Heilig" },
+  { el:"Feuer",  konter:"Magie"  },
+  { el:"Magie",  konter:"Feuer"  },
+  { el:"Heilig", konter:"Normal" },
+  { el:"Normal", konter:"Heilig" },
+  { el:"Feuer",  konter:"Magie"  },
+  { el:"Heilig", konter:"Normal" }
+];
+function towerStageIndex() { return Math.floor((towerFloor - 1) / 5); }   // 0..9
+function towerStageNummer() { return towerStageIndex() + 1; }
+// Resistenz-Tabelle für die aktuelle Etappe aufbauen (Boss stärker als normale Ebene)
+function towerBaueElementTbl(istBoss) {
+  let s = TOWER_STAGE_ELEMENTE[towerStageIndex()] || TOWER_STAGE_ELEMENTE[0];
+  let res = istBoss ? -0.40 : -0.18;   // Schaden gegen das Etappen-Element (negativ = resistent)
+  let weak = istBoss ?  0.40 :  0.18;  // Schaden mit dem Konter-Element (positiv = schwach)
+  let tbl = { Normal:0, Magie:0, Feuer:0, Heilig:0 };
+  tbl[s.el] = res; tbl[s.konter] = weak;
+  return tbl;
+}
+
+// Mutator-Pool. Manche helfen dir, manche fordern dich – jede Ebene ein anderer.
+const TOWER_MUTATOREN = ["keiner","raserei","zerbrechlich","eisenhaut","versiegelt","aderlass","gier"];
+function towerMutatorRollen(istBoss) {
+  // Ruhige Ebene 1 und alle Boss-Ebenen ohne "versiegelt" (zu hart) – sonst zufällig.
+  if (towerFloor === 1) return "keiner";
+  let pool = TOWER_MUTATOREN.slice();
+  if (istBoss) pool = pool.filter(m => m !== "versiegelt");
+  // 25% Chance auf eine ruhige Ebene, sonst echter Mutator
+  if (Math.random() < 0.25) return "keiner";
+  let echte = pool.filter(m => m !== "keiner");
+  return echte[Math.floor(Math.random() * echte.length)];
+}
+function towerMutName(m){ return t("tower_mut_" + m + "_n"); }
+function towerMutDesc(m){ return t("tower_mut_" + m + "_d"); }
+// Gegner-Schadensmultiplikator aus aktivem Mutator (raserei greift erst unter 30% HP)
+function towerGegnerDmgMult() {
+  let mult = 1.0;
+  if (towerAktMutator === "zerbrechlich") mult += 0.20;
+  if (towerAktMutator === "raserei" && gegnerMaxHp > 0 && gegnerHp <= gegnerMaxHp * 0.30) mult += 0.50;
+  return mult;
+}
+
 function starteTowerFloor() {
-  let hpMult  = 1 + (towerFloor - 1) * 0.07;   // Bosse werden pro Ebene staerker
+  let hpMult  = 1 + (towerFloor - 1) * 0.07;
   let dmgMult = 1 + (towerFloor - 1) * 0.05;
-  let boss = (towerFloor >= TOWER_EBENEN) ? TOWER_ENDBOSS : TOWER_BOSS_POOL[Math.floor(Math.random() * TOWER_BOSS_POOL.length)];
 
-  gegnerName    = boss.n;
-  gegnerMaxHp   = Math.round(boss.hp * hpMult);
+  // Boss alle 5 Ebenen (5,10,...). Ebene 50 = Endboss PCR. Sonst normaler Gegner/Miniboss.
+  let gegner, istBoss;
+  if (towerFloor >= TOWER_EBENEN)      { gegner = TOWER_ENDBOSS; istBoss = true; }
+  else if (towerFloor % 5 === 0)       { gegner = TOWER_BOSS_POOL[Math.floor(Math.random() * TOWER_BOSS_POOL.length)]; istBoss = true; }
+  else                                 { gegner = TOWER_ENEMY_POOL[Math.floor(Math.random() * TOWER_ENEMY_POOL.length)]; istBoss = false; }
+  towerAktuellerBoss = istBoss;
+
+  // Etappen-Siegel (Element) + Mutator dieser Ebene festlegen
+  towerElementTbl = towerBaueElementTbl(istBoss);
+  towerAktMutator = towerMutatorRollen(istBoss);
+
+  gegnerName    = gegner.n;
+  gegnerMaxHp   = Math.round(gegner.hp * hpMult);
+  if (towerAktMutator === "gier") gegnerMaxHp = Math.round(gegnerMaxHp * 1.40);  // Gier: +40% HP
   gegnerHp      = gegnerMaxHp;
-  gegnerSchaden = Math.round(boss.dmg * dmgMult);
-  towerBossBild = boss.bild;
+  gegnerSchaden = Math.round(gegner.dmg * dmgMult);
+  towerBossBild = gegner.bild;
 
-  // Spieler skaliert mit: +1 Waffenstufe pro Ebene, Basis-HP waechst, volle HP & Flakons je Ebene
-  waffenUpgrade = 2 + (towerFloor - 1);   // +2 Startbonus, dann +1 Stufe pro Ebene
-  spielerMaxHp  = Math.round(towerBaseHp * (1 + (towerFloor - 1) * 0.06));
-  spielerHp     = berechneFinalMaxHp();
-  spielerFlasks = maxKlassenFlasks;
+  // Spieler-Werte skalieren mit Basis + gesammelte Belohnungen + Shop-Käufe
+  waffenUpgrade   = 2 + (towerFloor - 1) + towerBonusUpgrade;
+  spielerMaxHp    = Math.round(towerBaseHp * (1 + (towerFloor - 1) * 0.06 + towerBonusHpPct));
+  maxKlassenFlasks = maxKlassenFlasksBasis + towerBonusFlasks;
 
-  if (window.ER) ER.reachStage(towerFloor); // Fortschritt fuer Score/Bestenliste
+  // ATTRITION: nur am Anfang einer Etappe (Ebene 1,6,11,... = direkt nach einer Rast) voll auffüllen.
+  // Sonst HP & Flakons aus der Vorebene übernehmen – nur auf das neue Maximum begrenzen.
+  let neuMax = berechneFinalMaxHp();
+  if ((towerFloor - 1) % 5 === 0) { spielerHp = neuMax; spielerFlasks = maxKlassenFlasks; }
+  else { spielerHp = Math.min(spielerHp <= 0 ? neuMax : spielerHp, neuMax); spielerFlasks = Math.min(spielerFlasks, maxKlassenFlasks); }
+
+  if (window.ER) ER.reachStage(towerFloor);
+  if (window.ER && ER.towerReached) ER.towerReached(towerFloor);
 
   imKampf = true; aktionsSperre = false; inSubDungeon = false;
   let img = document.getElementById("enemy-img");
-  img.onerror = function () { this.onerror = null; if (boss.fallback) { towerBossBild = boss.fallback; this.src = boss.fallback; } };
+  img.onerror = function () { this.onerror = null; if (gegner.fallback) { towerBossBild = gegner.fallback; this.src = gegner.fallback; } };
   document.getElementById("arena-enemy-name").innerText = gegnerNameLoc(gegnerName);
-  document.getElementById("battle-log").innerText = "🏯 " + t("tower_floor", { n: towerFloor }) + " — " + gegnerNameLoc(gegnerName) + "!";
+  let tag = istBoss ? "👑 " : "🏯 ";
+  let mutTxt = towerAktMutator !== "keiner" ? "  ⚙️ " + towerMutName(towerAktMutator) : "";
+  document.getElementById("battle-log").innerText = tag + t("tower_stage", { n: towerStageNummer() }) + " · " + t("tower_floor", { n: towerFloor }) + " — " + gegnerNameLoc(gegnerName) + "!" + mutTxt;
   speichereRun(); updateUI();
 }
 
 function towerSiegBehandeln() {
-  if (window.ER) { ER.fightWon(); ER.bossKilled(gegnerName); }
+  if (window.ER) { ER.fightWon(); if (towerAktuellerBoss) ER.bossKilled(gegnerName); }
+
+  // Turmscherben gutschreiben (Boss > normal, leicht mit Ebene skaliert, doppelt bei "Gier")
+  let basis = towerAktuellerBoss ? 50 : 12;
+  let gewinn = Math.round(basis + towerFloor * 1.5);
+  if (towerAktMutator === "gier") gewinn *= 2;
+  towerScherben += gewinn;
+
   if (towerFloor >= TOWER_EBENEN) {            // PCR besiegt -> Tower geschafft
     imKampf = false;
     if (window.ER) ER.gameCompleted();
     oeffneAbschlussPopup(t("tower_win_title"), t("tower_win_desc"));
     return;
   }
+
+  let geschafft = towerFloor;                   // gerade geräumte Ebene
   towerFloor++;
-  oeffneTowerPopup();
+  // Schmiede-Shop nach jedem 10er-Boss, sonst normale Belohnungswahl
+  if (towerAktuellerBoss && geschafft % 10 === 0) oeffneTowerShop();
+  else oeffneTowerBelohnungPopup();
 }
 
-function oeffneTowerPopup() {
+// Belohnung zwischen den Ebenen waehlen
+function oeffneTowerBelohnungPopup() {
   let overlay = document.getElementById("popup-overlay"); let content = document.getElementById("popup-content");
+  let rast = ((towerFloor - 1) % 5 === 0) ? '<p style="color:#e67e22; font-size:0.85rem; font-family:sans-serif; margin:2px 0 8px;">' + t("tower_full_restore") + '</p>' : '<p style="color:#5a6; font-size:0.78rem; font-family:sans-serif; margin:2px 0 8px;">' + t("tower_carry") + '</p>';
   content.innerHTML =
-    '<h3 style="color:#d4af37; font-size:1.5rem; margin-top:0; letter-spacing:2px; font-family:\'Mantinia\', serif;">🏯 ' + t("tower_next_title") + '</h3>' +
-    '<p style="color:#ddd; font-size:1.05rem; font-family: sans-serif;">' + t("tower_floor", { n: towerFloor }) + ' / ' + TOWER_EBENEN + '</p>' +
-    '<p style="color:#9aa0a6; font-size:0.85rem; font-family: sans-serif;">' + t("tower_next_desc") + '</p>' +
-    '<button class="btn-modal-action" onclick="towerWeiter()">' + t("tower_continue") + '</button>';
+    '<h3 style="color:#d4af37; font-size:1.4rem; margin-top:0; letter-spacing:2px; font-family:\'Mantinia\', serif;">🏯 ' + t("tower_next_title") + '</h3>' +
+    '<p style="color:#ddd; font-size:1rem; font-family: sans-serif; margin:4px 0;">' + t("tower_stage", { n: Math.floor((towerFloor - 1) / 5) + 1 }) + ' · ' + t("tower_floor", { n: towerFloor }) + ' / ' + TOWER_EBENEN + '</p>' +
+    '<p style="color:#d4af37; font-size:0.85rem; font-family:sans-serif; margin:2px 0;">🔹 ' + towerScherben + ' ' + t("tower_shards") + '</p>' +
+    rast +
+    '<p style="color:#9aa0a6; font-size:0.85rem; font-family: sans-serif; margin-bottom:14px;">' + t("tower_reward_pick") + '</p>' +
+    '<div style="display:flex; flex-direction:column; gap:10px;">' +
+      '<button class="btn-modal-action" style="margin:0;" onclick="towerBelohnung(\'schmiede\')">⚒️ ' + t("tower_reward_forge") + '</button>' +
+      '<button class="btn-modal-action" style="margin:0;" onclick="towerBelohnung(\'talisman\')">💍 ' + t("tower_reward_talisman") + '</button>' +
+      '<button class="btn-modal-action" style="margin:0;" onclick="towerBelohnung(\'hp\')">❤️ ' + t("tower_reward_hp") + '</button>' +
+    '</div>';
   overlay.style.display = "flex";
 }
-function towerWeiter() {
+
+function towerBelohnung(typ) {
+  if (typ === "schmiede") {
+    towerBonusUpgrade += 2;                       // +2 Waffenstufen dauerhaft
+  } else if (typ === "hp") {
+    towerBonusHpPct += 0.15;                       // +15% max HP dauerhaft
+  } else if (typ === "talisman") {
+    let tier = Math.min(3, Math.floor(towerFloor / 12)); // hoehere Ebene = besserer Talisman
+    let typId = guteTalismanIds[Math.floor(Math.random() * guteTalismanIds.length)];
+    let tal = erzeugeGutenTalisman(typId, tier);
+    if (ausgeruesteteTalismane.length < maxTalismanSlots) ausgeruesteteTalismane.push(tal);
+    else ausgeruesteteTalismane[0] = tal;          // Slots voll -> ersten ersetzen
+    if (window.ER && tal.id) ER.discover("t:" + tal.id);
+  }
   document.getElementById("popup-overlay").style.display = "none";
   starteTowerFloor();
 }
+
+// ===== Schmiede-Shop (alle 10 Ebenen) – Turmscherben ausgeben =====
+const TOWER_SHOP_KOSTEN = { forge: 60, flask: 90, hp: 50, talisman: 75 };
+function oeffneTowerShop(meldung) {
+  let overlay = document.getElementById("popup-overlay"); let content = document.getElementById("popup-content");
+  let k = TOWER_SHOP_KOSTEN;
+  let btn = (item, label, kosten) => {
+    let leistbar = towerScherben >= kosten;
+    let style = "margin:0;" + (leistbar ? "" : "opacity:0.45; cursor:not-allowed;");
+    let click = leistbar ? `onclick="towerKauf('${item}')"` : "";
+    return `<button class="btn-modal-action" style="${style}" ${click}>${label} <span style="color:#d4af37;">— ${kosten}🔹</span></button>`;
+  };
+  content.innerHTML =
+    '<h3 style="color:#d4af37; font-size:1.4rem; margin-top:0; letter-spacing:2px; font-family:\'Mantinia\', serif;">' + t("tower_shop_title") + '</h3>' +
+    '<p style="color:#e67e22; font-size:0.85rem; font-family:sans-serif; margin:2px 0;">' + t("tower_full_restore") + '</p>' +
+    '<p style="color:#d4af37; font-size:1.05rem; font-family:sans-serif; margin:6px 0; font-weight:bold;">🔹 ' + towerScherben + ' ' + t("tower_shards") + '</p>' +
+    '<p style="color:#9aa0a6; font-size:0.82rem; font-family:sans-serif; margin-bottom:6px;">' + t("tower_shop_desc") + '</p>' +
+    (meldung ? '<p style="color:#e74c3c; font-size:0.8rem; font-family:sans-serif; margin:0 0 8px;">' + meldung + '</p>' : '') +
+    '<div style="display:flex; flex-direction:column; gap:10px;">' +
+      btn("forge", "⚒️ " + t("tower_shop_forge"), k.forge) +
+      btn("flask", "🧪 " + t("tower_shop_flask"), k.flask) +
+      btn("hp", "❤️ " + t("tower_shop_hp"), k.hp) +
+      btn("talisman", "💍 " + t("tower_shop_talisman"), k.talisman) +
+      '<button class="btn-modal-action" style="margin-top:6px; border-color:#2ecc71;" onclick="towerShopFertig()">' + t("tower_shop_done") + '</button>' +
+    '</div>';
+  overlay.style.display = "flex";
+}
+function towerKauf(item) {
+  let kosten = TOWER_SHOP_KOSTEN[item];
+  if (towerScherben < kosten) { oeffneTowerShop(t("tower_shop_broke")); return; }
+  towerScherben -= kosten;
+  if (item === "forge") towerBonusUpgrade += 3;
+  else if (item === "flask") { towerBonusFlasks += 1; maxKlassenFlasks = maxKlassenFlasksBasis + towerBonusFlasks; spielerFlasks++; }
+  else if (item === "hp") towerBonusHpPct += 0.15;
+  else if (item === "talisman") {
+    let tier = Math.min(3, 2 + Math.floor(towerFloor / 30));
+    let typId = guteTalismanIds[Math.floor(Math.random() * guteTalismanIds.length)];
+    let tal = erzeugeGutenTalisman(typId, tier);
+    if (ausgeruesteteTalismane.length < maxTalismanSlots) ausgeruesteteTalismane.push(tal);
+    else ausgeruesteteTalismane[0] = tal;
+    if (window.ER && tal.id) ER.discover("t:" + tal.id);
+  }
+  oeffneTowerShop();
+}
+function towerShopFertig() {
+  document.getElementById("popup-overlay").style.display = "none";
+  starteTowerFloor();
+}
+
 
 function kampfGewonnen() {
   if (TOWER) { towerSiegBehandeln(); return; }
@@ -2023,6 +2244,7 @@ function oeffneTalismanPopup(naechsteEbene) {
   let tier = gibTalismanTier(); let istVerflucht = Math.random() < (hardMode ? 0.30 : 0.15); let neuerTalisman;
   if (istVerflucht) neuerTalisman = erzeugeSchlechtenTalisman(tier);
   else { let typId = guteTalismanIds[Math.floor(Math.random() * guteTalismanIds.length)]; neuerTalisman = erzeugeGutenTalisman(typId, tier); }
+  if (window.ER && neuerTalisman.id) ER.discover("t:" + neuerTalisman.id); // Eldendex
 
   let rarFarbe = neuerTalisman.rarity === "cursed" ? "#c0392b" : (raritaetFarben[neuerTalisman.rarity] || "#9aa0a6");
   let rarText = neuerTalisman.rarity === "cursed" ? t("rarity_cursed") : (raritaetLabel[neuerTalisman.rarity] || t("rarity_common"));
