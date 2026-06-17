@@ -27,7 +27,7 @@
   };
 
   const ONLINE = !!FIREBASE_CONFIG.apiKey && typeof firebase !== "undefined";
-  const PATCH = "1.4"; // aktuelle Spielversion – wird an neue Bestenlisten-Einträge angehängt
+  const PATCH = "1.5"; // aktuelle Spielversion – wird an neue Bestenlisten-Einträge angehängt
   let fbAuth = null, fbDB = null, currentUser = null;
   const userListeners = [];
 
@@ -234,9 +234,9 @@
     { id: "challenge_noblaidd",  name: "Einsamer Wolf",    icon: "🐺", desc: "Schließe einen No-Blaidd-Run ab.",    check: s => !!(s.challengesCompleted && s.challengesCompleted.noblaidd) },
     /* --- Battle Tower --- */
     { id: "tower_climb",  name: "Turmaufstieg",       icon: "🏯", desc: "Betritt den Battle Tower.",          check: s => (s.towerBestFloor || 0) >= 1 },
-    { id: "tower_10",     name: "Aufstrebend",        icon: "🪜", desc: "Erreiche Ebene 10 im Battle Tower.", check: s => (s.towerBestFloor || 0) >= 10 },
-    { id: "tower_25",     name: "Turmwächter",        icon: "🗼", desc: "Erreiche Ebene 25 im Battle Tower.", check: s => (s.towerBestFloor || 0) >= 25 },
-    { id: "tower_master", name: "Meister des Turms",  icon: "👑", desc: "Bezwinge den Battle Tower (alle 50 Ebenen).", check: s => !!(s.challengesCompleted && s.challengesCompleted.tower) },
+    { id: "tower_10",     name: "Aufstrebend",        icon: "🪜", desc: "Erreiche Akt 5 im Battle Tower.", check: s => (s.towerBestFloor || 0) >= 5 },
+    { id: "tower_25",     name: "Turmwächter",        icon: "🗼", desc: "Erreiche Akt 10 im Battle Tower.", check: s => (s.towerBestFloor || 0) >= 10 },
+    { id: "tower_master", name: "Meister des Turms",  icon: "👑", desc: "Bezwinge das komplette Boss-Gauntlet des Battle Tower.", check: s => !!(s.challengesCompleted && s.challengesCompleted.tower) },
     /* --- Eldendex --- */
     { id: "true_100", name: "True 100%", icon: "📖", desc: "Entdecke jeden Eintrag im Eldendex.", check: s => ELDENDEX_IDS.every(function (id) { return s.discovered && s.discovered[id]; }) }
   ];
@@ -275,8 +275,11 @@
   function runBump(key, n) { var r = getRun(); r[key] = (r[key] || 0) + (n || 1); saveRun(r); }
 
   function normDiff(d) { return d === "hard" ? "hard" : "normal"; }
-  function patchKey(p) { return String(p || PATCH).replace(/\./g, "_"); } // "1.4" -> "1_4"
-  function leererPatchSlot() { return { normal: { score: 0, stage: 0, bosses: 0 }, hard: { score: 0, stage: 0, bosses: 0 } }; }
+  // Bestenlisten-Kategorien: Basis (normal/hard), Battle Tower und je Challenge eine eigene Liste.
+  const LB_KATEGORIEN = ["normal", "hard", "tower", "noarmor", "noblaidd", "autobattle", "haligtree"];
+  function normCat(c) { return LB_KATEGORIEN.indexOf(c) >= 0 ? c : "normal"; }
+  function patchKey(p) { return String(p || PATCH).replace(/\./g, "_"); } // "1.5" -> "1_5"
+  function leererPatchSlot() { var o = {}; LB_KATEGORIEN.forEach(function (c) { o[c] = { score: 0, stage: 0, bosses: 0 }; }); return o; }
 
   /* ====== 5) ÖFFENTLICHE API (window.ER) ====== */
   const ER = {
@@ -284,9 +287,10 @@
     isOnline: function () { return ONLINE; },
 
     /* --- Run-Lebenszyklus --- */
-    startRun: function (difficulty) {
+    startRun: function (difficulty, category) {
       var diff = normDiff(difficulty);
-      saveRun({ stage: 1, bosses: 0, fights: 0, difficulty: diff, hadDeath: false });
+      var cat = normCat(category || diff);
+      saveRun({ stage: 1, bosses: 0, fights: 0, difficulty: diff, category: cat, hadDeath: false });
       bump("runsStarted");
       setMax("furthestStage", 1);
       setMax(diff === "hard" ? "furthestStageHard" : "furthestStageNormal", 1);
@@ -294,6 +298,7 @@
     endRun: function () {
       var r = getRun();
       var diff = normDiff(r.difficulty);
+      var cat = normCat(r.category || diff);
       var score = (r.stage || 0) * 1000 + (r.bosses || 0) * 200 + (r.fights || 0) * 10;
       // kombiniert (für die Stat-Anzeige) ...
       setMax("bestScore", score);
@@ -301,19 +306,20 @@
       // ... getrennt nach Schwierigkeit (Stat-Anzeige/Cloud-Kompatibilität) ...
       setMax(diff === "hard" ? "bestScoreHard" : "bestScoreNormal", score);
       setMax(diff === "hard" ? "bestRunBossesHard" : "bestRunBossesNormal", r.bosses || 0);
-      // ... und pro Patch + Schwierigkeit (das ist die Quelle für die Bestenliste)
+      // ... und pro Patch + KATEGORIE (Quelle der jeweiligen Bestenliste)
       if (score > 0) {
         var s = getStats();
         var pk = patchKey(PATCH);
         s.patchBest = s.patchBest || {};
         if (!s.patchBest[pk]) s.patchBest[pk] = leererPatchSlot();
-        var slot = s.patchBest[pk][diff];
+        if (!s.patchBest[pk][cat]) s.patchBest[pk][cat] = { score: 0, stage: 0, bosses: 0 };
+        var slot = s.patchBest[pk][cat];
         if (score > (slot.score || 0)) { slot.score = score; slot.stage = r.stage || 0; slot.bosses = r.bosses || 0; }
         saveStats(s);
       }
-      submitToBoard(score, { stage: r.stage || 0, bosses: r.bosses || 0, fights: r.fights || 0, difficulty: diff });
-      // Zähler zurücksetzen – Schwierigkeit & hadDeath bleiben bis zum nächsten startRun erhalten
-      saveRun({ stage: 0, bosses: 0, fights: 0, difficulty: diff, hadDeath: r.hadDeath });
+      submitToBoard(score, { stage: r.stage || 0, bosses: r.bosses || 0, fights: r.fights || 0, difficulty: diff, category: cat });
+      // Zähler zurücksetzen – Schwierigkeit, Kategorie & hadDeath bleiben bis zum nächsten startRun erhalten
+      saveRun({ stage: 0, bosses: 0, fights: 0, difficulty: diff, category: cat, hadDeath: r.hadDeath });
       return score;
     },
 
@@ -332,7 +338,13 @@
     gameCompleted: function () { bump("gamesCompleted"); ER.endRun(); },
     flaskDrunk:   function () { bump("flasksDrunk"); },
     reachStage:   function (n) { if (n) { setMax("furthestStage", n); var r = getRun(); var diff = normDiff(r.difficulty); setMax(diff === "hard" ? "furthestStageHard" : "furthestStageNormal", n); if (n > (r.stage || 0)) { r.stage = n; saveRun(r); } } },
-    towerReached: function (n) { if (n) setMax("towerBestFloor", n); },
+    towerReached: function (n) {
+      if (!n) return;
+      setMax("towerBestFloor", n);
+      var r = getRun();
+      if (r.category === "tower" && n > (r.stage || 0)) { r.stage = n; saveRun(r); }
+    },
+    bestTower: function () { return getStats().towerBestFloor || 0; },
 
     /* --- Hard Mode & Challenges --- */
     hardCompleted: function () {
@@ -400,14 +412,12 @@
     },
     signOut: function () { if (fbAuth) return fbAuth.signOut(); return Promise.resolve(); },
 
-    /* --- Bestenliste (getrennt nach Patch + Schwierigkeit) --- */
-    getLeaderboard: function (limit, cb, difficulty, patch) {
+    /* --- Bestenliste (getrennt nach Patch + Kategorie) --- */
+    getLeaderboard: function (limit, cb, category, patch) {
       limit = limit || 20;
-      var diff = normDiff(difficulty);
+      var cat = normCat(category);
       var pk = patchKey(patch || PATCH);
-      var scoreField = "lb." + pk + "." + (diff === "hard" ? "hardScore" : "normalScore");
-      var stageField = "lb." + pk + "." + (diff === "hard" ? "hardStage" : "normalStage");
-      var bossField  = "lb." + pk + "." + (diff === "hard" ? "hardBosses" : "normalBosses");
+      var scoreField = "lb." + pk + "." + cat + "Score";
       if (ONLINE && fbDB) {
         fbDB.collection("users").orderBy(scoreField, "desc").limit(limit).get()
           .then(function (snap) {
@@ -415,34 +425,35 @@
             snap.forEach(function (d) {
               var x = d.data();
               var box = (x.lb && x.lb[pk]) ? x.lb[pk] : {};
-              var sc = (diff === "hard" ? box.hardScore : box.normalScore) || 0;
+              var sc = box[cat + "Score"] || 0;
               if (sc <= 0) return; // keine leeren Einträge im jeweiligen Board
               rows.push({
                 name: x.displayName || "Befleckter",
                 score: sc,
-                stage: (diff === "hard" ? box.hardStage : box.normalStage) || 0,
-                bosses: (diff === "hard" ? box.hardBosses : box.normalBosses) || 0,
+                stage: box[cat + "Stage"] || 0,
+                bosses: box[cat + "Bosses"] || 0,
                 photo: x.photoURL || "",
                 patch: pk.replace(/_/g, ".")
               });
             });
             cb(rows, true);
           })
-          .catch(function (e) { console.warn("[ER] Bestenliste online fehlgeschlagen, lokal:", e); cb(localBoard(limit, diff, pk), false); });
+          .catch(function (e) { console.warn("[ER] Bestenliste online fehlgeschlagen, lokal:", e); cb(localBoard(limit, cat, pk), false); });
       } else {
-        cb(localBoard(limit, diff, pk), false);
+        cb(localBoard(limit, cat, pk), false);
       }
     }
   };
 
   /* ====== 6) LOKALE BESTENLISTE ====== */
-  function localBoard(limit, difficulty, patch) {
-    var diff = normDiff(difficulty);
+  function eintragKategorie(x) { return x.category || normDiff(x.difficulty); }   // Legacy-Einträge -> Schwierigkeit
+  function localBoard(limit, category, patch) {
+    var cat = normCat(category);
     var pk = patchKey(patch || PATCH);
     var b = lsGet(BOARD_KEY, []).filter(function (x) {
       // Einträge ohne Patch-Feld stammen aus der Zeit vor v1.4 -> als "1.3" behandeln
       var entryPk = patchKey(x.patch || "1.3");
-      return normDiff(x.difficulty) === diff && entryPk === pk;
+      return eintragKategorie(x) === cat && entryPk === pk;
     });
     b.sort(function (a, c) { return c.score - a.score; });
     return b.slice(0, limit);
@@ -450,12 +461,12 @@
   function submitToBoard(score, meta) {
     if (score <= 0) return;
     var name = ER.getPlayerName();
-    var diff = normDiff(meta.difficulty);
-    // lokal – ein bester Eintrag pro Name UND Schwierigkeit
+    var cat = normCat(meta.category || normDiff(meta.difficulty));
+    // lokal – ein bester Eintrag pro Name UND Kategorie
     var b = lsGet(BOARD_KEY, []);
-    var mine = b.find(function (x) { return x.name === name && x.local && normDiff(x.difficulty) === diff; });
+    var mine = b.find(function (x) { return x.name === name && x.local && eintragKategorie(x) === cat; });
     if (mine) { if (score > mine.score) { mine.score = score; mine.stage = meta.stage; mine.bosses = meta.bosses; mine.patch = PATCH; } }
-    else { b.push({ name: name, score: score, stage: meta.stage, bosses: meta.bosses, difficulty: diff, patch: PATCH, local: true }); }
+    else { b.push({ name: name, score: score, stage: meta.stage, bosses: meta.bosses, difficulty: normDiff(meta.difficulty), category: cat, patch: PATCH, local: true }); }
     lsSet(BOARD_KEY, b);
     // cloud
     cloudPush();
@@ -463,21 +474,22 @@
 
   /* ====== 7) CLOUD-SYNC (Firestore) ====== */
   // Baut aus stats.patchBest die "lb"-Map, nach der die Online-Bestenliste sortiert.
+  // Enthält je Kategorie <cat>Score/<cat>Stage/<cat>Bosses (normalScore/hardScore bleiben abwärtskompatibel).
   function baueLbMap(s) {
     var lb = {};
     var pb = s.patchBest || {};
     Object.keys(pb).forEach(function (pk) {
-      var slot = pb[pk] || {};
-      var n = slot.normal || {}, h = slot.hard || {};
-      lb[pk] = {
-        normalScore: n.score || 0, normalStage: n.stage || 0, normalBosses: n.bosses || 0,
-        hardScore: h.score || 0,   hardStage: h.stage || 0,   hardBosses: h.bosses || 0
-      };
+      var slot = pb[pk] || {}; var box = {};
+      LB_KATEGORIEN.forEach(function (cat) {
+        var c = slot[cat] || { score: 0, stage: 0, bosses: 0 };
+        box[cat + "Score"] = c.score || 0; box[cat + "Stage"] = c.stage || 0; box[cat + "Bosses"] = c.bosses || 0;
+      });
+      lb[pk] = box;
     });
     return lb;
   }
 
-  // Vereint zwei patchBest-Maps: pro Patch + Schwierigkeit gewinnt der höhere Score.
+  // Vereint zwei patchBest-Maps: pro Patch + Kategorie gewinnt der höhere Score.
   function mergePatchBest(localPB, cloudPB) {
     localPB = localPB || {}; cloudPB = cloudPB || {};
     var out = {}, keys = {};
@@ -486,11 +498,15 @@
     Object.keys(keys).forEach(function (pk) {
       var lSlot = localPB[pk] || {}, cSlot = cloudPB[pk] || {};
       out[pk] = {};
-      ["normal", "hard"].forEach(function (diff) {
-        var l = lSlot[diff] || { score: 0, stage: 0, bosses: 0 };
-        var c = cSlot[diff] || { score: 0, stage: 0, bosses: 0 };
+      // alle in beiden Slots vorkommenden Kategorien berücksichtigen
+      var cats = {}; LB_KATEGORIEN.forEach(function (c) { cats[c] = true; });
+      Object.keys(lSlot).forEach(function (c) { cats[c] = true; });
+      Object.keys(cSlot).forEach(function (c) { cats[c] = true; });
+      Object.keys(cats).forEach(function (cat) {
+        var l = lSlot[cat] || { score: 0, stage: 0, bosses: 0 };
+        var c = cSlot[cat] || { score: 0, stage: 0, bosses: 0 };
         var win = (l.score || 0) >= (c.score || 0) ? l : c;
-        out[pk][diff] = { score: win.score || 0, stage: win.stage || 0, bosses: win.bosses || 0 };
+        out[pk][cat] = { score: win.score || 0, stage: win.stage || 0, bosses: win.bosses || 0 };
       });
     });
     return out;
