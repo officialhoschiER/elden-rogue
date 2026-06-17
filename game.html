@@ -16,6 +16,9 @@
       src: url('fonts/Mantinia Regular.otf') format('opentype');
       font-weight: normal;
       font-style: normal;
+      /* Mantinia hat fehlerhafte Glyphen für '%' (U+0025) und '+' (U+002B) -> diese aus der
+         Schrift ausschließen, damit der Fallback (serif) sie korrekt rendert. */
+      unicode-range: U+0-24, U+26-2A, U+2C-10FFFF;
     }
 /* Zwingt das gesamte Dokument, nur die Großbuchstaben der Font zu nutzen */
 body {
@@ -616,7 +619,7 @@ function speichereRun() {
     backpackItems, activeDungeonBuff, dungeonBuffRemainingCombats,
     aktuelleRegion, aktuelleEbene, geloesieKnotenIds, aktuellerKnotenId,
     netzKarte, inSubDungeon, mainMapState,
-    towerFloor, towerBaseHp, towerBonusUpgrade, towerBonusHpPct, towerScherben, towerBonusFlasks, maxKlassenFlasksBasis, towerAktMutator, towerElementTbl, towerAktuellerBoss, towerBossBild
+    towerFloor, towerBaseHp, towerBonusUpgrade, towerBonusHpPct, towerScherben, towerBonusFlasks, maxKlassenFlasksBasis, towerAktMutator, towerElementTbl, towerAktuellerBoss, towerBossBild, towerTree
   };
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch(e) {}
 }
@@ -643,6 +646,7 @@ function ladeGespeichertenRun() {
       towerFloor=d.towerFloor||1; towerBaseHp=d.towerBaseHp||spielerMaxHp; towerBonusUpgrade=d.towerBonusUpgrade||0; towerBonusHpPct=d.towerBonusHpPct||0;
       towerScherben=d.towerScherben||0; towerBonusFlasks=d.towerBonusFlasks||0; maxKlassenFlasksBasis=d.maxKlassenFlasksBasis||maxKlassenFlasks;
       towerAktMutator=d.towerAktMutator||"keiner"; towerElementTbl=d.towerElementTbl||null; towerAktuellerBoss=!!d.towerAktuellerBoss; towerBossBild=d.towerBossBild||"";
+      towerTree=Object.assign({ schaerfe:0, henker:0, zaeh:0, stein:0, wendig:0, blut:0 }, d.towerTree||{});
       starteTowerFloor();
       return true;
     }
@@ -1214,7 +1218,7 @@ function waehleKlasseEngine(klasse) {
   spielerHp = spielerMaxHp; document.getElementById("popup-content").classList.remove("klassen-modal"); document.getElementById("popup-overlay").style.display = "none";
   if (window.ER) ER.startRun(hardMode ? "hard" : "normal");
   speichereRun();
-  if (TOWER) { towerFloor = 1; towerBaseHp = spielerMaxHp; towerBonusUpgrade = 0; towerBonusHpPct = 0; towerScherben = 0; towerBonusFlasks = 0; maxKlassenFlasksBasis = maxKlassenFlasks; ausgeruesteteTalismane = []; starteTowerFloor(); return; }
+  if (TOWER) { towerFloor = 1; towerBaseHp = spielerMaxHp; towerBonusUpgrade = 0; towerBonusHpPct = 0; towerScherben = 0; towerBonusFlasks = 0; maxKlassenFlasksBasis = maxKlassenFlasks; towerTree = { schaerfe:0, henker:0, zaeh:0, stein:0, wendig:0, blut:0 }; ausgeruesteteTalismane = []; starteTowerFloor(); return; }
   updateUI();
 }
 
@@ -1340,7 +1344,7 @@ function updateUI() {
   if (aktiveRune === "radahn")  { runeHpBonus += Math.round(spielerMaxHp * 0.50); runeDmgBonus += 20; }
   if (aktiveRune === "morgott") { finalHpMultiplier += 1.0; } 
   
-  let finaleAusweichChance = Math.min(hardMode ? 0.65 : 0.75, basisAusweichChance + tStats.extraRolle + runeRollBonus);
+  let finaleAusweichChance = Math.min(hardMode ? 0.65 : 0.75, basisAusweichChance + tStats.extraRolle + runeRollBonus + (TOWER ? towerTreeDodge() : 0));
   let finalMaxHp = berechneFinalMaxHp();
   if (spielerHp > finalMaxHp) spielerHp = finalMaxHp;
 
@@ -1744,6 +1748,7 @@ function spielerAngriff() {
   if (dungeonBuffRemainingCombats > 0 && activeDungeonBuff === "dmg") finalDmgMultiplier += 0.15;
   let finalDmg = Math.round((baseWeaponDmg + runeDmgBonus) * finalDmgMultiplier);
   let bossMod = gibBossSchadensModifikator(); if (bossMod !== 0) finalDmg = Math.round(finalDmg * (1 + bossMod));
+  if (TOWER) finalDmg = Math.round(finalDmg * towerTreeDmgMult());   // Aufstiegsbaum: Henkersschlag
 
   let warBurst = false; let warBonus = false;
   if (nextHitBonusDamage) { finalDmg = Math.round(finalDmg * 1.3); nextHitBonusDamage = false; warBonus = true; }
@@ -1759,9 +1764,10 @@ function spielerAngriff() {
 
   let schaden = DEBUG_DMG ? 9999 : (finalDmg + Math.floor(Math.random() * 5) - 2);
   gegnerHp = Math.max(0, gegnerHp - schaden);
-  if (TOWER && towerAktMutator === "aderlass" && schaden > 0) {   // Aderlass: 6% Lifesteal
-    let geheilt = Math.max(1, Math.round(schaden * 0.06)), fmax = berechneFinalMaxHp();
-    if (spielerHp < fmax) { spielerHp = Math.min(fmax, spielerHp + geheilt); zeigeFloatingZahl(playerWrapper, "+" + geheilt, "dmg-heal"); }
+  if (TOWER && schaden > 0) {   // Lifesteal: Aderlass-Mutator (6%) + Aufstiegsbaum "Blutsauger"
+    let rate = (towerAktMutator === "aderlass" ? 0.06 : 0) + towerTreeLifesteal();
+    if (rate > 0) { let geheilt = Math.max(1, Math.round(schaden * rate)), fmax = berechneFinalMaxHp();
+      if (spielerHp < fmax) { spielerHp = Math.min(fmax, spielerHp + geheilt); zeigeFloatingZahl(playerWrapper, "+" + geheilt, "dmg-heal"); } }
   }
 
   if (gegnerHp > 0) {
@@ -1792,14 +1798,14 @@ function spielerAngriff() {
 
     enemyWrapper.style.transform = "translateX(-40px)"; let runeRollBonus = aktiveRune === "godrick" ? 0.15 : 0.0;
     if (dungeonBuffRemainingCombats > 0 && activeDungeonBuff === "dodge") runeRollBonus += 0.15;
-    let finaleAusweichChance = Math.min(hardMode ? 0.65 : 0.75, basisAusweichChance + tStats.extraRolle + runeRollBonus);
+    let finaleAusweichChance = Math.min(hardMode ? 0.65 : 0.75, basisAusweichChance + tStats.extraRolle + runeRollBonus + (TOWER ? towerTreeDodge() : 0));
     let wuerfel = Math.random(); let ausgewichen = wuerfel < finaleAusweichChance;
 
     setTimeout(() => {
       enemyWrapper.style.transform = "translateX(0)";
       if (ausgewichen) { playerWrapper.classList.add("player-rolling"); zeigeFloatingZahl(playerWrapper, t("float_dodged"), "dmg-dodge"); document.getElementById("battle-log").innerText += t("roll_success"); updateUI(); } 
       else {
-        let gSchaden = gegnerSchaden + Math.floor(Math.random() * 4) - 1; gSchaden = Math.round(gSchaden * (1 + tStats.bonusDmgTakenPercent) * (1 - ruestungReduktion) * (TOWER ? towerGegnerDmgMult() : 1)); gSchaden = Math.max(1, gSchaden);
+        let gSchaden = gegnerSchaden + Math.floor(Math.random() * 4) - 1; gSchaden = Math.round(gSchaden * (1 + tStats.bonusDmgTakenPercent) * (1 - ruestungReduktion) * (1 - (TOWER ? towerTreeDR() : 0)) * (TOWER ? towerGegnerDmgMult() : 1)); gSchaden = Math.max(1, gSchaden);
         spielerHp = Math.max(0, spielerHp - gSchaden); playerWrapper.classList.add("enemy-hurt"); zeigeFloatingZahl(playerWrapper, "-" + gSchaden, "dmg-enemy");
         document.getElementById("battle-log").innerText += t("roll_fail", { name: gegnerNameLoc(gegnerName), dmg: gSchaden }); updateUI();
       }
@@ -1830,12 +1836,12 @@ function spielerHeilen() {
       }
       let runeRollBonus = aktiveRune === "godrick" ? 0.15 : 0.0;
       if (dungeonBuffRemainingCombats > 0 && activeDungeonBuff === "dodge") runeRollBonus += 0.15;
-      let finaleAusweichChance = Math.min(hardMode ? 0.65 : 0.75, basisAusweichChance + tStats.extraRolle + runeRollBonus);
+      let finaleAusweichChance = Math.min(hardMode ? 0.65 : 0.75, basisAusweichChance + tStats.extraRolle + runeRollBonus + (TOWER ? towerTreeDodge() : 0));
       let wuerfel = Math.random(); let ausgewichen = wuerfel < finaleAusweichChance;
 
       if (ausgewichen) { playerWrapper.classList.add("player-rolling"); zeigeFloatingZahl(playerWrapper, t("float_dodged"), "dmg-dodge"); document.getElementById("battle-log").innerText += t("heal_roll_success"); updateUI(); } 
       else {
-        let gSchaden = gegnerSchaden + Math.floor(Math.random() * 3); gSchaden = Math.round(gSchaden * (1 + tStats.bonusDmgTakenPercent) * (1 - ruestungReduktion) * (TOWER ? towerGegnerDmgMult() : 1));
+        let gSchaden = gegnerSchaden + Math.floor(Math.random() * 3); gSchaden = Math.round(gSchaden * (1 + tStats.bonusDmgTakenPercent) * (1 - ruestungReduktion) * (1 - (TOWER ? towerTreeDR() : 0)) * (TOWER ? towerGegnerDmgMult() : 1));
         gSchaden = Math.max(1, gSchaden); spielerHp = Math.max(0, spielerHp - gSchaden);
         playerWrapper.classList.add("enemy-hurt"); zeigeFloatingZahl(playerWrapper, "-" + gSchaden, "dmg-enemy"); document.getElementById("battle-log").innerText += t("heal_roll_fail", { name: gegnerNameLoc(gegnerName), dmg: gSchaden }); updateUI();
       }
@@ -1952,6 +1958,37 @@ function towerGegnerDmgMult() {
   return mult;
 }
 
+// ===== TOWER: Aufstiegsbaum (kleiner Skill-Tree, mit Turmscherben bezahlt) =====
+// 3 Pfade je 2 Knoten. Der 2. Knoten eines Pfads braucht Rang>=1 im 1. -> echte Verzweigung.
+// Knoten sind mehrfach steigerbar (Rang), Kosten steigen pro Rang. So bleiben über 50 Ebenen
+// laufend Entscheidungen offen (wo investiere ich weiter?), statt 49x dieselben 3 Knöpfe.
+let towerTree = { schaerfe: 0, henker: 0, zaeh: 0, stein: 0, wendig: 0, blut: 0 };
+const TOWER_TREE = [
+  { id: "schaerfe", branch: "klinge", icon: "⚔️", needs: null },
+  { id: "henker",   branch: "klinge", icon: "🗡️", needs: "schaerfe" },
+  { id: "zaeh",     branch: "wall",   icon: "❤️", needs: null },
+  { id: "stein",    branch: "wall",   icon: "🛡️", needs: "zaeh" },
+  { id: "wendig",   branch: "jaeger", icon: "💨", needs: null },
+  { id: "blut",     branch: "jaeger", icon: "🩸", needs: "wendig" }
+];
+const TOWER_BRANCH_NAME = { klinge: "tower_tree_klinge", wall: "tower_tree_wall", jaeger: "tower_tree_jaeger" };
+function towerTreeKosten(id) { return 30 + (towerTree[id] || 0) * 25; }      // nächster Rang: 30, 55, 80, ...
+function towerTreeVerfuegbar(id) { let n = TOWER_TREE.find(x => x.id === id); return !n.needs || (towerTree[n.needs] || 0) >= 1; }
+// Effekt-Getter – einzige Wahrheitsquelle sind die Ränge (reload-sicher, keine Doppel-Anwendung):
+function towerTreeWeaponBonus() { return (towerTree.schaerfe || 0) * 2; }          // +2 Waffenstufen je Rang
+function towerTreeHpPct()       { return (towerTree.zaeh || 0) * 0.12; }           // +12% max HP je Rang
+function towerTreeDmgMult()     { return 1 + (towerTree.henker || 0) * 0.06; }     // +6% Schaden je Rang
+function towerTreeDR()          { return Math.min(0.40, (towerTree.stein || 0) * 0.04); }   // +4% Schadensreduktion/Rang (max 40%)
+function towerTreeDodge()       { return Math.min(0.30, (towerTree.wendig || 0) * 0.05); }  // +5% Ausweichen/Rang (max 30%)
+function towerTreeLifesteal()   { return (towerTree.blut || 0) * 0.03; }           // +3% Lifesteal je Rang
+// Kurzbeschreibung des nächsten Rangs (für die Baum-Anzeige)
+function towerTreeEffektText(id) {
+  let r = (towerTree[id] || 0);
+  let werte = { schaerfe: "+" + ((r + 1) * 2) + " ⚔", henker: "+" + ((r + 1) * 6) + "% DMG", zaeh: "+" + ((r + 1) * 12) + "% HP",
+                stein: "+" + Math.min(40, (r + 1) * 4) + "% DEF", wendig: "+" + Math.min(30, (r + 1) * 5) + "% DODGE", blut: "+" + ((r + 1) * 3) + "% LIFESTEAL" };
+  return werte[id] || "";
+}
+
 function starteTowerFloor() {
   let hpMult  = 1 + (towerFloor - 1) * 0.07;
   let dmgMult = 1 + (towerFloor - 1) * 0.05;
@@ -1974,9 +2011,9 @@ function starteTowerFloor() {
   gegnerSchaden = Math.round(gegner.dmg * dmgMult);
   towerBossBild = gegner.bild;
 
-  // Spieler-Werte skalieren mit Basis + gesammelte Belohnungen + Shop-Käufe
-  waffenUpgrade   = 2 + (towerFloor - 1) + towerBonusUpgrade;
-  spielerMaxHp    = Math.round(towerBaseHp * (1 + (towerFloor - 1) * 0.06 + towerBonusHpPct));
+  // Spieler-Werte skalieren mit Basis + gesammelte Belohnungen + Aufstiegsbaum
+  waffenUpgrade   = 2 + (towerFloor - 1) + towerBonusUpgrade + towerTreeWeaponBonus();
+  spielerMaxHp    = Math.round(towerBaseHp * (1 + (towerFloor - 1) * 0.06 + towerBonusHpPct + towerTreeHpPct()));
   maxKlassenFlasks = maxKlassenFlasksBasis + towerBonusFlasks;
 
   // ATTRITION: nur am Anfang einer Etappe (Ebene 1,6,11,... = direkt nach einer Rast) voll auffüllen.
@@ -2016,90 +2053,71 @@ function towerSiegBehandeln() {
 
   let geschafft = towerFloor;                   // gerade geräumte Ebene
   towerFloor++;
-  // Schmiede-Shop nach jedem 10er-Boss, sonst normale Belohnungswahl
-  if (towerAktuellerBoss && geschafft % 10 === 0) oeffneTowerShop();
-  else oeffneTowerBelohnungPopup();
+  oeffneTowerBelohnungPopup();                  // Aufstiegsbaum zwischen den Ebenen
 }
 
-// Belohnung zwischen den Ebenen waehlen
+// ===== Aufstiegsbaum zwischen den Ebenen =====
+function towerBaumKnotenHtml(node) {
+  let id = node.id, rang = towerTree[id] || 0, kosten = towerTreeKosten(id);
+  let verf = towerTreeVerfuegbar(id), leistbar = towerScherben >= kosten && verf;
+  let farbe = node.branch === "klinge" ? "#e6705a" : (node.branch === "wall" ? "#5aa9e6" : "#7ad17a");
+  let border = leistbar ? farbe : "#3a3a3a";
+  let opacity = verf ? (leistbar ? "1" : "0.65") : "0.4";
+  let cursor = leistbar ? "pointer" : "default";
+  let click = leistbar ? `onclick="towerKaufBaum('${id}')"` : "";
+  let lock = verf ? "" : "🔒 ";
+  return `<div ${click} style="border:1px solid ${border}; border-radius:5px; padding:7px 6px; margin-bottom:7px; background:rgba(0,0,0,0.35); opacity:${opacity}; cursor:${cursor}; font-family:sans-serif; text-align:left;">
+      <div style="font-size:0.82rem; color:#eee;">${lock}${node.icon} <b>${t("tower_tree_" + id)}</b> <span style="color:#888;">R${rang}</span></div>
+      <div style="display:flex; justify-content:space-between; margin-top:3px;">
+        <span style="font-size:0.7rem; color:${farbe}; font-weight:bold;">${towerTreeEffektText(id)}</span>
+        <span style="font-size:0.72rem; color:#d4af37;">${kosten} 🔹</span>
+      </div>
+    </div>`;
+}
+
 function oeffneTowerBelohnungPopup() {
   let overlay = document.getElementById("popup-overlay"); let content = document.getElementById("popup-content");
-  let rast = ((towerFloor - 1) % 5 === 0) ? '<p style="color:#e67e22; font-size:0.85rem; font-family:sans-serif; margin:2px 0 8px;">' + t("tower_full_restore") + '</p>' : '<p style="color:#5a6; font-size:0.78rem; font-family:sans-serif; margin:2px 0 8px;">' + t("tower_carry") + '</p>';
+  let rast = ((towerFloor - 1) % 5 === 0)
+    ? '<p style="color:#e67e22; font-size:0.82rem; font-family:sans-serif; margin:2px 0 6px;">' + t("tower_full_restore") + '</p>'
+    : '<p style="color:#5a6; font-size:0.76rem; font-family:sans-serif; margin:2px 0 6px;">' + t("tower_carry") + '</p>';
+  let cols = ["klinge", "wall", "jaeger"].map(b => {
+    let nodes = TOWER_TREE.filter(n => n.branch === b).map(towerBaumKnotenHtml).join("");
+    return '<div style="flex:1; min-width:148px;"><div style="font-family:\'Mantinia\',serif; font-size:0.8rem; letter-spacing:1px; text-transform:uppercase; color:#cdbfa3; text-align:center; margin-bottom:5px;">' + t(TOWER_BRANCH_NAME[b]) + '</div>' + nodes + '</div>';
+  }).join("");
   content.innerHTML =
     '<h3 style="color:#d4af37; font-size:1.4rem; margin-top:0; letter-spacing:2px; font-family:\'Mantinia\', serif;">🏯 ' + t("tower_next_title") + '</h3>' +
-    '<p style="color:#ddd; font-size:1rem; font-family: sans-serif; margin:4px 0;">' + t("tower_stage", { n: Math.floor((towerFloor - 1) / 5) + 1 }) + ' · ' + t("tower_floor", { n: towerFloor }) + ' / ' + TOWER_EBENEN + '</p>' +
-    '<p style="color:#d4af37; font-size:0.85rem; font-family:sans-serif; margin:2px 0;">🔹 ' + towerScherben + ' ' + t("tower_shards") + '</p>' +
+    '<p style="color:#ddd; font-size:0.95rem; font-family:sans-serif; margin:4px 0;">' + t("tower_stage", { n: Math.floor((towerFloor - 1) / 5) + 1 }) + ' · ' + t("tower_floor", { n: towerFloor }) + ' / ' + TOWER_EBENEN + '</p>' +
+    '<p style="color:#d4af37; font-size:0.95rem; font-family:sans-serif; margin:2px 0; font-weight:bold;">🔹 ' + towerScherben + ' ' + t("tower_shards") + '</p>' +
     rast +
-    '<p style="color:#9aa0a6; font-size:0.85rem; font-family: sans-serif; margin-bottom:14px;">' + t("tower_reward_pick") + '</p>' +
-    '<div style="display:flex; flex-direction:column; gap:10px;">' +
-      '<button class="btn-modal-action" style="margin:0;" onclick="towerBelohnung(\'schmiede\')">⚒️ ' + t("tower_reward_forge") + '</button>' +
-      '<button class="btn-modal-action" style="margin:0;" onclick="towerBelohnung(\'talisman\')">💍 ' + t("tower_reward_talisman") + '</button>' +
-      '<button class="btn-modal-action" style="margin:0;" onclick="towerBelohnung(\'hp\')">❤️ ' + t("tower_reward_hp") + '</button>' +
+    '<p style="color:#9aa0a6; font-size:0.8rem; font-family:sans-serif; margin:6px 0 10px;">' + t("tower_tree_pick") + '</p>' +
+    '<div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center;">' + cols + '</div>' +
+    '<div style="display:flex; gap:8px; margin-top:10px;">' +
+      '<button class="btn-modal-action" style="margin:0; flex:1; border-color:#b97cff; color:#c9a3ff;" onclick="towerKaufTalisman()">💍 ' + t("tower_reward_talisman") + ' <span style="color:#d4af37;">75🔹</span></button>' +
+      '<button class="btn-modal-action" style="margin:0; flex:1; border-color:#2ecc71; color:#2ecc71;" onclick="towerBaumFertig()">' + t("tower_tree_continue") + '</button>' +
     '</div>';
   overlay.style.display = "flex";
 }
 
-function towerBelohnung(typ) {
-  if (typ === "schmiede") {
-    towerBonusUpgrade += 2;                       // +2 Waffenstufen dauerhaft
-  } else if (typ === "hp") {
-    towerBonusHpPct += 0.15;                       // +15% max HP dauerhaft
-  } else if (typ === "talisman") {
-    let tier = Math.min(3, Math.floor(towerFloor / 12)); // hoehere Ebene = besserer Talisman
-    let typId = guteTalismanIds[Math.floor(Math.random() * guteTalismanIds.length)];
-    let tal = erzeugeGutenTalisman(typId, tier);
-    if (ausgeruesteteTalismane.length < maxTalismanSlots) ausgeruesteteTalismane.push(tal);
-    else ausgeruesteteTalismane[0] = tal;          // Slots voll -> ersten ersetzen
-    if (window.ER && tal.id) ER.discover("t:" + tal.id);
-  }
-  document.getElementById("popup-overlay").style.display = "none";
-  starteTowerFloor();
+function towerKaufBaum(id) {
+  let kosten = towerTreeKosten(id);
+  if (!towerTreeVerfuegbar(id) || towerScherben < kosten) return;
+  towerScherben -= kosten; towerTree[id] = (towerTree[id] || 0) + 1;
+  speichereRun(); oeffneTowerBelohnungPopup();
 }
 
-// ===== Schmiede-Shop (alle 10 Ebenen) – Turmscherben ausgeben =====
-const TOWER_SHOP_KOSTEN = { forge: 60, flask: 90, hp: 50, talisman: 75 };
-function oeffneTowerShop(meldung) {
-  let overlay = document.getElementById("popup-overlay"); let content = document.getElementById("popup-content");
-  let k = TOWER_SHOP_KOSTEN;
-  let btn = (item, label, kosten) => {
-    let leistbar = towerScherben >= kosten;
-    let style = "margin:0;" + (leistbar ? "" : "opacity:0.45; cursor:not-allowed;");
-    let click = leistbar ? `onclick="towerKauf('${item}')"` : "";
-    return `<button class="btn-modal-action" style="${style}" ${click}>${label} <span style="color:#d4af37;">— ${kosten}🔹</span></button>`;
-  };
-  content.innerHTML =
-    '<h3 style="color:#d4af37; font-size:1.4rem; margin-top:0; letter-spacing:2px; font-family:\'Mantinia\', serif;">' + t("tower_shop_title") + '</h3>' +
-    '<p style="color:#e67e22; font-size:0.85rem; font-family:sans-serif; margin:2px 0;">' + t("tower_full_restore") + '</p>' +
-    '<p style="color:#d4af37; font-size:1.05rem; font-family:sans-serif; margin:6px 0; font-weight:bold;">🔹 ' + towerScherben + ' ' + t("tower_shards") + '</p>' +
-    '<p style="color:#9aa0a6; font-size:0.82rem; font-family:sans-serif; margin-bottom:6px;">' + t("tower_shop_desc") + '</p>' +
-    (meldung ? '<p style="color:#e74c3c; font-size:0.8rem; font-family:sans-serif; margin:0 0 8px;">' + meldung + '</p>' : '') +
-    '<div style="display:flex; flex-direction:column; gap:10px;">' +
-      btn("forge", "⚒️ " + t("tower_shop_forge"), k.forge) +
-      btn("flask", "🧪 " + t("tower_shop_flask"), k.flask) +
-      btn("hp", "❤️ " + t("tower_shop_hp"), k.hp) +
-      btn("talisman", "💍 " + t("tower_shop_talisman"), k.talisman) +
-      '<button class="btn-modal-action" style="margin-top:6px; border-color:#2ecc71;" onclick="towerShopFertig()">' + t("tower_shop_done") + '</button>' +
-    '</div>';
-  overlay.style.display = "flex";
+function towerKaufTalisman() {
+  if (towerScherben < 75) return;
+  towerScherben -= 75;
+  let tier = Math.min(3, 1 + Math.floor(towerFloor / 18));
+  let typId = guteTalismanIds[Math.floor(Math.random() * guteTalismanIds.length)];
+  let tal = erzeugeGutenTalisman(typId, tier);
+  if (ausgeruesteteTalismane.length < maxTalismanSlots) ausgeruesteteTalismane.push(tal);
+  else ausgeruesteteTalismane[0] = tal;
+  if (window.ER && tal.id) ER.discover("t:" + tal.id);
+  speichereRun(); oeffneTowerBelohnungPopup();
 }
-function towerKauf(item) {
-  let kosten = TOWER_SHOP_KOSTEN[item];
-  if (towerScherben < kosten) { oeffneTowerShop(t("tower_shop_broke")); return; }
-  towerScherben -= kosten;
-  if (item === "forge") towerBonusUpgrade += 3;
-  else if (item === "flask") { towerBonusFlasks += 1; maxKlassenFlasks = maxKlassenFlasksBasis + towerBonusFlasks; spielerFlasks++; }
-  else if (item === "hp") towerBonusHpPct += 0.15;
-  else if (item === "talisman") {
-    let tier = Math.min(3, 2 + Math.floor(towerFloor / 30));
-    let typId = guteTalismanIds[Math.floor(Math.random() * guteTalismanIds.length)];
-    let tal = erzeugeGutenTalisman(typId, tier);
-    if (ausgeruesteteTalismane.length < maxTalismanSlots) ausgeruesteteTalismane.push(tal);
-    else ausgeruesteteTalismane[0] = tal;
-    if (window.ER && tal.id) ER.discover("t:" + tal.id);
-  }
-  oeffneTowerShop();
-}
-function towerShopFertig() {
+
+function towerBaumFertig() {
   document.getElementById("popup-overlay").style.display = "none";
   starteTowerFloor();
 }
