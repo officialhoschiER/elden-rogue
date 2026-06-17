@@ -79,6 +79,18 @@
     .btn-continue:hover { background: #2ecc71; color: #111; box-shadow: 0 0 24px rgba(46,204,113,0.5); transform: translateY(-2px); animation: none; }
     .btn-continue-hard { color: #e74c3c; border-color: #e74c3c; background: #261414; }
     .btn-continue-hard:hover { background: #e74c3c; }
+
+    .btn-tower { background: linear-gradient(135deg, #2a1d0c, #3a2a12); color: #e6a23c; border: 1px solid #e6a23c; position: relative; overflow: hidden; }
+    .btn-tower:hover { background: linear-gradient(135deg, #e6a23c, #d4892a); color: #1a1208; box-shadow: 0 0 26px rgba(230,162,60,0.55); transform: translateY(-2px); }
+    .btn-tower::after { content: none; }
+    #btn-tower { position: relative; overflow: hidden; }
+    #btn-tower::after { content: "⚔️"; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 1rem; opacity: 0.7; }
+
+    .tower-guide-list { list-style: none; padding: 0; margin: 16px 0; text-align: left; }
+    .tower-guide-list li { font-family: sans-serif; font-size: 0.86rem; color: #cdbfa3; line-height: 1.5; padding: 9px 0 9px 26px; border-bottom: 1px solid rgba(230,162,60,0.12); position: relative; }
+    .tower-guide-list li:last-child { border-bottom: none; }
+    .tower-guide-list li::before { content: "▸"; position: absolute; left: 4px; top: 9px; color: #e6a23c; }
+    .tower-guide-list li b { color: #e6a23c; }
     @keyframes continuePulse { 0%,100% { box-shadow: 0 0 8px rgba(46,204,113,0.3); } 50% { box-shadow: 0 0 18px rgba(46,204,113,0.6); } }
     .challenge-card { background: #0f0f0f; border: 1px solid var(--border-color); border-radius: 6px; padding: 16px; display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
     .challenge-card .ch-icon { font-size: 2rem; width: 44px; text-align: center; flex-shrink: 0; }
@@ -192,6 +204,8 @@
   <a href="game.html" class="btn-main btn-normal" id="btn-normal" onclick="return checkOverwrite('game.html')">Normaler Modus</a>
   <a href="game.html?mode=hard" class="btn-main btn-hard-active" id="btn-hard" onclick="return checkOverwrite('game.html?mode=hard')">Hard Mode</a>
 
+  <button class="btn-main btn-tower" id="btn-tower" onclick="openTowerGuide()">🏯 Battle Tower</button>
+
   <a href="game.html?resume=true" class="btn-main btn-continue" id="btn-continue" style="display:none;">▶ Run fortsetzen</a>
 
   <div class="btn-row">
@@ -203,6 +217,9 @@
     </button>
     <button class="btn-secondary" onclick="openModal('challenges')">
       <span class="btn-icon">🏴</span> <span id="btn-ch-text">Challenges</span>
+    </button>
+    <button class="btn-secondary" onclick="openModal('eldendex')">
+      <span class="btn-icon">📖</span> <span id="btn-dex-text">Eldendex</span>
     </button>
   </div>
 
@@ -227,6 +244,24 @@
   <div class="cam-box" onclick="event.stopPropagation()">
     <div class="cam-spot">📷 CAM</div>
     <div class="cam-hint">↑ Kamera hier platzieren (unten rechts)</div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-tower-guide">
+  <div class="modal-box" style="max-width:520px;">
+    <button class="modal-close" onclick="closeModals()">&times;</button>
+    <div class="modal-title" id="tg-title" style="color:#e6a23c;">🏯 Battle Tower</div>
+    <p id="tg-sub" style="text-align:center; color:#b5a98f; font-family:sans-serif; font-size:0.85rem; margin:-6px 0 4px;">Ein Aufstieg, kein Spaziergang. So funktioniert er:</p>
+    <ul class="tower-guide-list">
+      <li id="tg-l1"></li>
+      <li id="tg-l2"></li>
+      <li id="tg-l3"></li>
+      <li id="tg-l4"></li>
+      <li id="tg-l5"></li>
+      <li id="tg-l6"></li>
+    </ul>
+    <a href="#" id="tg-start" onclick="return checkOverwrite('game.html?challenge=tower')" class="btn-main btn-tower" style="max-width:none; margin-top:4px;">Turm betreten ⚔️</a>
+    <button class="btn-mini" id="tg-close" onclick="closeModals()" style="display:block; margin:12px auto 0;">Zurück</button>
   </div>
 </div>
 
@@ -322,6 +357,16 @@
   </div>
 </div>
 
+<div class="modal-bg" id="modal-eldendex">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModals()">&times;</button>
+    <div class="modal-title" id="dex-title">Eldendex</div>
+    <div class="ach-progress" id="dex-progress"></div>
+    <div id="dex-tabs" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:14px;"></div>
+    <div id="dex-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:10px;"></div>
+  </div>
+</div>
+
 <script>
   /* ===== UI Translation Logic ===== */
   function renderStaticText() {
@@ -352,6 +397,8 @@
 
     // Challenge labels
     document.getElementById("ch-title").innerText = t("challenge_title");
+    document.getElementById("btn-dex-text").innerText = t("dex_title");
+    document.getElementById("dex-title").innerText = t("dex_title");
     document.getElementById("ch-noarmor-name").innerText = t("challenge_noarmor");
     document.getElementById("ch-noarmor-desc").innerText = t("challenge_noarmor_desc");
     document.getElementById("ch-noarmor-btn-n").innerText = t("lb_mode_normal");
@@ -366,6 +413,13 @@
     document.getElementById("ch-haligtree-desc").innerText = t("challenge_haligtree_desc");
     document.getElementById("ch-footer").innerText = lang === 'en' ? "More challenges coming soon…" : "Weitere Challenges kommen bald…";
     document.getElementById("btn-ch-text").innerText = t("challenge_title");
+    // Battle Tower button + guide
+    document.getElementById("btn-tower").innerText = t("tower_btn");
+    document.getElementById("tg-title").innerText = t("tower_guide_title");
+    document.getElementById("tg-sub").innerText = t("tower_guide_sub");
+    for (var i = 1; i <= 6; i++) document.getElementById("tg-l" + i).innerHTML = t("tower_guide_l" + i);
+    document.getElementById("tg-start").innerText = t("tower_guide_start");
+    document.getElementById("tg-close").innerText = t("tower_guide_close");
     // Continue button
     checkContinueButtons(t);
   }
@@ -408,6 +462,7 @@
     if (window.ER) { renderAccount(ER.currentUser()); }
     if (document.getElementById("modal-bestenliste").classList.contains("open")) ladeBestenliste();
     if (document.getElementById("modal-achievements").classList.contains("open")) ladeAchievements();
+    if (document.getElementById("modal-eldendex").classList.contains("open")) ladeEldendex();
   });
 
   /* ===== Modal Handling ===== */
@@ -432,6 +487,63 @@
     if (m) m.classList.add("open");
     if (name === "bestenliste") ladeBestenliste();
     if (name === "achievements") ladeAchievements();
+    if (name === "eldendex") ladeEldendex();
+  }
+
+  function openTowerGuide() {
+    if (window.i18n) renderStaticText();   // sicherstellen, dass der Guide in aktueller Sprache steht
+    openModal("tower-guide");
+  }
+  window.openTowerGuide = openTowerGuide;
+
+  /* ===== Eldendex ===== */
+  var dexCurrentCat = "weapons";
+  var DEX_CATS = [
+    { key:"weapons",   label:{ de:"Waffen",    en:"Weapons" } },
+    { key:"armor",     label:{ de:"Rüstung",   en:"Armor" } },
+    { key:"talismans", label:{ de:"Talismane", en:"Talismans" } },
+    { key:"gegner",    label:{ de:"Gegner",    en:"Enemies" } },
+    { key:"bosse",     label:{ de:"Bosse",     en:"Bosses" } }
+  ];
+  function ladeEldendex() {
+    if (!window.ER || !ER.getDex) return;
+    var dex = ER.getDex();
+    var lang = window.i18n ? window.i18n.getLang() : "de";
+    // Tabs
+    var tabs = document.getElementById("dex-tabs");
+    tabs.innerHTML = "";
+    DEX_CATS.forEach(function(c){
+      var cat = dex.cats[c.key] || { found:0, total:0 };
+      var active = c.key === dexCurrentCat;
+      var btn = document.createElement("button");
+      btn.className = "btn-mini";
+      btn.style.cssText = "border-color:" + (active?"var(--gold)":"var(--gold-dark)") + ";color:" + (active?"var(--gold)":"#b8a96f") + ";";
+      btn.innerText = c.label[lang] + " (" + cat.found + "/" + cat.total + ")";
+      btn.onclick = function(){ dexCurrentCat = c.key; ladeEldendex(); };
+      tabs.appendChild(btn);
+    });
+    // Fortschritt gesamt
+    var done = dex.found === dex.total && dex.total > 0;
+    document.getElementById("dex-progress").innerHTML = (lang==="en"?"Discovered: ":"Entdeckt: ") + "<b>" + dex.found + " / " + dex.total + "</b>" + (done ? " &nbsp;✅ <b style='color:var(--gold)'>True 100%</b>" : "");
+    // Raster
+    var grid = document.getElementById("dex-grid");
+    grid.innerHTML = "";
+    var cat = dex.cats[dexCurrentCat];
+    if (!cat) return;
+    cat.items.forEach(function(it){
+      var cell = document.createElement("div");
+      cell.style.cssText = "background:#0f0f0f;border:1px solid " + (it.seen?"var(--gold-dark)":"#222") + ";border-radius:6px;padding:8px 6px;text-align:center;";
+      var img = it.seen
+        ? '<img src="'+it.img+'" style="width:100%;height:70px;object-fit:contain;" onerror="this.style.opacity=0.2">'
+        : '<img src="'+it.img+'" style="width:100%;height:70px;object-fit:contain;filter:grayscale(1) brightness(0);opacity:0.5;">';
+      var nm = '<div style="font-size:0.7rem;color:'+(it.seen?"#d4c89a":"#555")+';margin-top:6px;font-family:sans-serif;line-height:1.2;min-height:26px;">'+(it.seen?it.name:"???")+'</div>';
+      var st = "";
+      if (it.seen && it.cat === "weapons" && it.dmg) {
+        st = '<div style="font-size:0.66rem;color:#9aa0a6;font-family:sans-serif;">⚔️ '+it.dmg+(it.types?' · '+it.types.join("/"):'')+'</div>';
+      }
+      cell.innerHTML = img + nm + st;
+      grid.appendChild(cell);
+    });
   }
   function closeModals() {
     document.querySelectorAll(".modal-bg").forEach(function(m) { m.classList.remove("open"); });
