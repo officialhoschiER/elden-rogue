@@ -978,7 +978,9 @@ const bDatenbankHTML = {
   8: "images/icons/icon_tower.png", 9: "images/icons/icon_quest.webp", 10: "images/icons/icon_dungeon.webp",
   11: "images/Gegner/icon_skel.jpg", 12: "images/icons/icon_chest.jpg", 13: "images/Gegner/icon_run.jpg",
   15: "images/icons/fort-nightreign-full.jpg",
-  14: "images/background/Eldenringcaveofknowledge.jpeg"
+  14: "images/background/Eldenringcaveofknowledge.jpeg",
+  20: "images/icons/icon_talisman.webp",   // Tower: Schmiede/Shop
+  21: "images/icons/icon_quest.webp"        // Tower: mysteriöses Ereignis
 };
 
 const gewichteterPfadePool = [1, 1, 2, 2, 2, 3, 6, 9, 10, 14, 14];
@@ -1284,7 +1286,7 @@ function baueKarteHTML() {
       
       if (knoten.typ === 5) {
         nodeDiv.classList.add("boss-node"); imgTag.classList.add("map-node-boss-img"); imgTag.classList.remove("map-node-img");
-        if (TOWER) imgTag.src = "images/bosse/pcr.webp";
+        if (TOWER) imgTag.src = TOWER_AKT_BOSSE[(towerAkt - 1) % TOWER_AKT_BOSSE.length].bild;
         else if (inSubDungeon) imgTag.src = "images/bosse/catacomb_boss.jpg";
         else {
           if (aktuelleRegion === "Limgrave") imgTag.src = "images/bosse/godrick.webp"; else if (aktuelleRegion === "Caelid") imgTag.src = "images/bosse/radahn.webp";
@@ -2034,21 +2036,31 @@ function towerVerknuepfungen(anzahl, naechste, k) {
   return [Math.min(k, naechste - 1)];
 }
 function generiereTowerNetz() {
+  // Pro Reihe garantierte Knotentypen (Rest wird mit Kampf/Elite aufgefüllt) -> jede Reihe bietet echte Wahl.
+  // Typen: 3=Kampf, 1=Elite, 7=Aufstiegsbaum, 12=Rast, 20=Schmiede/Shop, 21=Ereignis, 5=Boss
+  let plan = [
+    [],            // Reihe 1 (2): Aufwärm-Kämpfe
+    [7, 21],       // Reihe 2 (3): Aufstiegsbaum · Ereignis · Kampf
+    [20, 12, 1],   // Reihe 3 (4): Schmiede · Rast · Elite · Kampf
+    [7, 21]        // Reihe 4 (3): Aufstiegsbaum · Ereignis · Elite
+  ];
   let karte = [];
   for (let e = 0; e < TOWER_MAP_LAYOUT.length; e++) {
     let anzahl = TOWER_MAP_LAYOUT[e], naechste = TOWER_MAP_LAYOUT[e + 1] || 0, knoten = [];
-    let istBossReihe = (e === TOWER_MAP_LAYOUT.length - 1);
-    for (let k = 0; k < anzahl; k++) {
-      let typ = istBossReihe ? 5 : (Math.random() < 0.62 ? 3 : 1);   // sonst 62% Kampf, 38% Elite
-      knoten.push({ id: "T_" + (e + 1) + "_" + k, index: k, typ: typ, wege: towerVerknuepfungen(anzahl, naechste, k) });
+    if (e === TOWER_MAP_LAYOUT.length - 1) {
+      knoten.push({ id: "T_" + (e + 1) + "_0", index: 0, typ: 5, wege: [] });   // Boss
+    } else {
+      let typen = (plan[e] || []).slice();
+      while (typen.length < anzahl) typen.push(Math.random() < 0.6 ? 3 : 1);     // mit Kampf/Elite auffüllen
+      typen = typen.slice(0, anzahl);
+      for (let i = typen.length - 1; i > 0; i--) { let j = Math.floor(Math.random() * (i + 1)); let tmp = typen[i]; typen[i] = typen[j]; typen[j] = tmp; }  // mischen
+      for (let k = 0; k < anzahl; k++) knoten.push({ id: "T_" + (e + 1) + "_" + k, index: k, typ: typen[k], wege: towerVerknuepfungen(anzahl, naechste, k) });
     }
     karte.push({ ebene: e + 1, knoten: knoten });
   }
-  // Garantiere Entscheidungen: Aufstiegsbaum in Reihe 2 & 4, eine Rast in der breiten Reihe 3.
-  let setze = (reiheIdx, typ) => { let z = karte[reiheIdx]; z.knoten[Math.floor(Math.random() * z.knoten.length)].typ = typ; };
-  setze(1, 7); setze(2, 12); setze(3, 7);
   return karte;
 }
+function towerAktBoss() { return TOWER_AKT_BOSSE[(towerAkt - 1) % TOWER_AKT_BOSSE.length]; }
 
 function starteTowerRun() {
   if (window.ER) ER.startRun("normal", "tower");   // eigener Bestenlisten-Topf "tower"
@@ -2079,6 +2091,8 @@ function towerStarteAkt() {
 function towerKnotenHandler(ebene, knoten) {
   if (knoten.typ === 7) { towerBaumKontext = "knoten"; oeffneTowerBelohnungPopup(); return; }  // Aufstiegsbaum
   if (knoten.typ === 12) { towerRastKnoten(ebene); return; }                                    // Rast: heilen + Scherben
+  if (knoten.typ === 20) { towerShopGeneriere(ebene); oeffneTowerShop(ebene); return; }          // Schmiede/Shop
+  if (knoten.typ === 21) { oeffneTowerEvent(ebene); return; }                                    // mysteriöses Ereignis
   towerSetupKampf(knoten.typ, ebene);                                                           // 3=Kampf, 1=Elite, 5=Boss
 }
 
@@ -2140,6 +2154,104 @@ function towerRastKnoten(ebene) {
   spielerHp = berechneFinalMaxHp(); spielerFlasks = maxKlassenFlasks;
   let bonus = 25 + towerAkt * 8 + ebene * 3; towerScherben += bonus;
   oeffneStatPopup("🏕️ " + t("tower_rest_title"), t("tower_rest_desc", { n: bonus }), ebene + 1);
+}
+
+// Nicht-Kampf-Knoten abschließen -> nächste Reihe
+function towerNodeWeiter() {
+  document.getElementById("popup-overlay").style.display = "none";
+  aktuelleEbene = aktuelleEbene + 1;
+  speichereRun(); baueKarteHTML(); updateUI();
+}
+
+function towerGibTalisman() {
+  let tier = Math.min(3, 1 + Math.floor(towerAkt / 3));
+  let typId = guteTalismanIds[Math.floor(Math.random() * guteTalismanIds.length)];
+  let tal = erzeugeGutenTalisman(typId, tier);
+  if (ausgeruesteteTalismane.length < maxTalismanSlots) ausgeruesteteTalismane.push(tal);
+  else ausgeruesteteTalismane[0] = tal;
+  if (window.ER && tal.id) ER.discover("t:" + tal.id);
+}
+
+// ===== Schmiede / Shop (zufällige Angebote, mit Scherben bezahlt) =====
+let towerShopAngebote = [];
+function towerShopGeneriere(ebene) {
+  let p = function (b) { return Math.round(b * (1 + (towerAkt - 1) * 0.15)); };
+  let pool = [
+    { id: "waffe",    icon: "⚒️", preis: p(45), apply: function () { towerBonusUpgrade += 3; } },
+    { id: "hp",       icon: "❤️", preis: p(50), apply: function () { towerBonusHpPct += 0.15; } },
+    { id: "flakon",   icon: "🧪", preis: p(55), apply: function () { towerBonusFlasks += 1; maxKlassenFlasks = maxKlassenFlasksBasis + towerBonusFlasks; spielerFlasks = Math.min(maxKlassenFlasks, spielerFlasks + 1); } },
+    { id: "talisman", icon: "💍", preis: p(70), apply: function () { towerGibTalisman(); } },
+    { id: "heal",     icon: "✨", preis: p(28), apply: function () { spielerHp = berechneFinalMaxHp(); } }
+  ];
+  let aus = [], kopie = pool.slice();
+  for (let i = 0; i < 3 && kopie.length; i++) { let idx = Math.floor(Math.random() * kopie.length); aus.push(Object.assign({ gekauft: false }, kopie.splice(idx, 1)[0])); }
+  towerShopAngebote = aus;
+}
+function oeffneTowerShop(ebene) {
+  let overlay = document.getElementById("popup-overlay"), content = document.getElementById("popup-content");
+  let karten = towerShopAngebote.map(function (a, i) {
+    let leistbar = !a.gekauft && towerScherben >= a.preis;
+    let farbe = a.gekauft ? "#555" : (leistbar ? "#2ecc71" : "#a33");
+    let click = leistbar ? ' onclick="towerShopKauf(' + i + ')"' : "";
+    let status = a.gekauft ? '<span style="color:#2ecc71;">✓ ' + t("tower_shop_bought") + '</span>' : '<span style="color:#d4af37;">' + a.preis + ' 🔹</span>';
+    return '<div' + click + ' style="border:1px solid ' + (leistbar ? "#2ecc71" : "#3a3a3a") + '; border-radius:6px; padding:9px 10px; margin-bottom:8px; background:rgba(0,0,0,0.35); opacity:' + (a.gekauft ? "0.5" : "1") + '; cursor:' + (leistbar ? "pointer" : "default") + '; display:flex; justify-content:space-between; align-items:center; font-family:sans-serif; text-align:left;">' +
+      '<span style="font-size:0.86rem; color:#eee;">' + a.icon + ' <b>' + t("shop_" + a.id) + '</b><br><span style="font-size:0.72rem; color:#9aa0a6;">' + t("shop_" + a.id + "_d") + '</span></span>' +
+      '<span style="font-size:0.78rem; white-space:nowrap; margin-left:8px;">' + status + '</span></div>';
+  }).join("");
+  content.innerHTML =
+    '<h3 style="color:#d4af37; font-size:1.4rem; margin-top:0; letter-spacing:2px; font-family:\'Mantinia\', serif;">⚒️ ' + t("tower_shop_title") + '</h3>' +
+    '<p style="color:#d4af37; font-size:0.95rem; font-family:sans-serif; margin:2px 0 10px; font-weight:bold;">🔹 ' + towerScherben + ' ' + t("tower_shards") + '</p>' +
+    karten +
+    '<button class="btn-modal-action" style="margin-top:6px; border-color:#2ecc71; color:#2ecc71;" onclick="towerNodeWeiter()">' + t("tower_tree_continue") + '</button>';
+  overlay.style.display = "flex";
+}
+function towerShopKauf(i) {
+  let a = towerShopAngebote[i];
+  if (!a || a.gekauft || towerScherben < a.preis) return;
+  towerScherben -= a.preis; a.gekauft = true; a.apply();
+  speichereRun(); oeffneTowerShop();
+}
+
+// ===== Mysteriöse Ereignisse (Entscheidung mit Risiko/Belohnung) =====
+const TOWER_EVENTS = [
+  { id: "blutpakt", choices: [
+    { k: "ev_blutpakt_a", apply: function () { spielerHp = Math.max(1, Math.round(spielerHp * 0.75)); towerBonusUpgrade += 3; } },
+    { k: "ev_decline",    apply: function () {} } ] },
+  { id: "truhe", choices: [
+    { k: "ev_truhe_a", apply: function () { if (Math.random() < 0.6) { towerScherben += 60 + towerAkt * 8; } else { towerBonusHpPct = Math.max(0, towerBonusHpPct - 0.08); towerScherben += 25; } } },
+    { k: "ev_decline", apply: function () {} } ] },
+  { id: "haendler", choices: [
+    { k: "ev_haendler_a", apply: function () { towerGibTalisman(); } },
+    { k: "ev_haendler_b", apply: function () { if (towerScherben >= 40) { towerScherben -= 40; towerBonusUpgrade += 2; } } } ] },
+  { id: "statue", choices: [
+    { k: "ev_statue_a", apply: function () { spielerHp = berechneFinalMaxHp(); spielerFlasks = maxKlassenFlasks; } },
+    { k: "ev_statue_b", apply: function () { towerScherben += 50 + towerAkt * 6; towerBonusHpPct = Math.max(0, towerBonusHpPct - 0.06); } } ] },
+  { id: "raetsel", choices: [
+    { k: "ev_raetsel_a", apply: function () { if (Math.random() < 0.5) towerScherben += 70 + towerAkt * 8; else towerScherben = Math.round(towerScherben * 0.5); } },
+    { k: "ev_raetsel_b", apply: function () { towerScherben += 20 + towerAkt * 3; } } ] },
+  { id: "asche", choices: [
+    { k: "ev_asche_a", apply: function () { towerBonusFlasks += 1; maxKlassenFlasks = maxKlassenFlasksBasis + towerBonusFlasks; spielerFlasks = maxKlassenFlasks; } },
+    { k: "ev_asche_b", apply: function () { towerScherben += 40 + towerAkt * 5; } } ] }
+];
+let towerAktEvent = null;
+function oeffneTowerEvent(ebene) {
+  towerAktEvent = TOWER_EVENTS[Math.floor(Math.random() * TOWER_EVENTS.length)];
+  let overlay = document.getElementById("popup-overlay"), content = document.getElementById("popup-content");
+  let btns = towerAktEvent.choices.map(function (c, i) {
+    return '<button class="btn-modal-action" style="margin:6px 0 0; border-color:#b97cff; color:#c9a3ff;" onclick="towerEventWahl(' + i + ')">' + t(c.k) + '</button>';
+  }).join("");
+  content.innerHTML =
+    '<h3 style="color:#c9a3ff; font-size:1.4rem; margin-top:0; letter-spacing:2px; font-family:\'Mantinia\', serif;">❓ ' + t("ev_" + towerAktEvent.id + "_t") + '</h3>' +
+    '<p style="color:#cdc6bb; font-size:0.86rem; font-family:sans-serif; margin:6px 0 4px; line-height:1.5;">' + t("ev_" + towerAktEvent.id + "_d") + '</p>' +
+    '<p style="color:#d4af37; font-size:0.82rem; font-family:sans-serif; margin:2px 0 6px;">🔹 ' + towerScherben + ' ' + t("tower_shards") + '</p>' +
+    btns;
+  overlay.style.display = "flex";
+}
+function towerEventWahl(i) {
+  if (!towerAktEvent || !towerAktEvent.choices[i]) return;
+  towerAktEvent.choices[i].apply();
+  towerAktEvent = null;
+  towerNodeWeiter();
 }
 
 function towerSiegBehandeln() {
