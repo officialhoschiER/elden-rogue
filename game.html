@@ -292,6 +292,33 @@ h1, h2, h3, .btn-menu, .btn-combat, .btn-social, .game-author-tag, #region-displ
 
     #battle-controls { background-color: rgba(12, 12, 12, 0.95); border: 1px solid var(--border-color); border-radius: 4px; padding: 15px; }
     #battle-log { min-height: 50px; font-style: italic; font-size: 0.95rem; margin-bottom: 15px; white-space: pre-line; line-height: 1.4; color: #fff; }
+    #tower-floor-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; background: linear-gradient(to right, rgba(20,16,10,0.85), rgba(12,10,16,0.85)); border: 1px solid #6b5a2e; border-radius: 8px; padding: 8px 14px; margin: 0 auto 14px; max-width: 560px; }
+    #tower-floor-label { font-family: 'Mantinia', serif; letter-spacing: 2px; font-size: 0.95rem; color: var(--gold); white-space: nowrap; }
+    #tower-floor-effect { font-family: sans-serif; font-size: 0.78rem; line-height: 1.35; text-align: right; flex: 1 1 auto; min-width: 140px; }
+    #tower-floor-effect .fx-name { font-weight: bold; }
+    #tower-floor-effect .fx-desc { color: #9aa0a6; }
+    #tower-floor-effect .fx-calm { color: #6f7378; font-style: italic; }
+    /* ===== Tower-Schmiede (Shop) ===== */
+    .tshop-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+    .tshop-title { font-family: 'Mantinia', serif; letter-spacing: 3px; font-size: 1.3rem; color: var(--gold); margin: 0; }
+    .tshop-bal { font-family: sans-serif; font-size: 0.82rem; font-weight: bold; color: #e9cf86; background: rgba(212,175,55,0.12); border: 1px solid rgba(212,175,55,0.35); border-radius: 999px; padding: 4px 13px; white-space: nowrap; }
+    .tshop-sub { color: #8c8676; font-family: sans-serif; font-size: 0.74rem; margin: 6px 0 16px; }
+    .tshop-list { display: flex; flex-direction: column; gap: 9px; margin-bottom: 16px; }
+    .tshop-row { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 10px; background: rgba(255,255,255,0.02); border: 1px solid #262220; text-align: left; transition: transform .12s, border-color .12s, background .12s; }
+    .tshop-row.buyable { cursor: pointer; }
+    .tshop-row.buyable:hover { transform: translateY(-1px); border-color: var(--gold); background: rgba(212,175,55,0.06); }
+    .tshop-row.locked { opacity: 0.5; }
+    .tshop-row.done { opacity: 0.5; }
+    .tshop-ico { flex: 0 0 auto; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; border-radius: 9px; background: rgba(0,0,0,0.35); border: 1px solid #3a342a; }
+    .tshop-body { flex: 1 1 auto; min-width: 0; }
+    .tshop-name { font-family: sans-serif; font-weight: bold; color: #f0e9da; font-size: 0.92rem; }
+    .tshop-desc { font-family: sans-serif; color: #8f8a7e; font-size: 0.74rem; line-height: 1.35; }
+    .tshop-price { flex: 0 0 auto; font-family: sans-serif; font-weight: bold; font-size: 0.82rem; white-space: nowrap; padding: 6px 13px; border-radius: 999px; }
+    .tshop-price.ok { color: #1a1206; background: var(--gold); }
+    .tshop-price.no { color: #b08a6a; background: transparent; border: 1px solid #5a4a3a; }
+    .tshop-price.bought { color: #54d98c; background: transparent; border: 1px solid rgba(84,217,140,0.4); }
+    .tshop-leave { width: 100%; background: transparent; border: 1px solid #3a342a; color: #b7ad97; font-family: 'Mantinia', serif; letter-spacing: 2px; font-size: 0.85rem; padding: 9px; border-radius: 8px; cursor: pointer; transition: border-color .12s, color .12s; }
+    .tshop-leave:hover { border-color: var(--gold); color: var(--gold); }
     .hp-container-with-text { width: 100%; position: relative; display: flex; align-items: center; justify-content: center; }
     progress { -webkit-appearance: none; appearance: none; width: 100%; border-radius: 2px; border: 1px solid #0 black; box-sizing: border-box; }
     .battle-arena progress { height: 26px; margin: 8px 0; border: 1px solid #111; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
@@ -493,6 +520,10 @@ h1, h2, h3, .btn-menu, .btn-combat, .btn-social, .game-author-tag, #region-displ
     </div>
     
     <div id="battle-view" class="battle-arena" style="display: none;">
+      <div id="tower-floor-bar" style="display:none;">
+        <span id="tower-floor-label">🏯 EBENE 1</span>
+        <span id="tower-floor-effect"></span>
+      </div>
       <div class="fighters-container">
         <div class="fighter-wrapper" id="player-sprite-wrapper">
           <strong id="ui-combat-player" style="color:var(--gold); font-size:0.9rem; letter-spacing:1px; margin-bottom:5px;">DU</strong>
@@ -1381,7 +1412,7 @@ function updateUI() {
   if (aktiveRune === "radahn")  { runeHpBonus += Math.round(spielerMaxHp * 0.50); runeDmgBonus += 20; }
   if (aktiveRune === "morgott") { finalHpMultiplier += 1.0; } 
   
-  let finaleAusweichChance = Math.min(hardMode ? 0.65 : 0.75, basisAusweichChance + tStats.extraRolle + runeRollBonus + (TOWER ? towerTreeDodge() : 0));
+  let finaleAusweichChance = Math.min(hardMode ? 0.65 : 0.75, basisAusweichChance + tStats.extraRolle + runeRollBonus + (TOWER ? towerTreeDodge() + (towerAktMutator === "leichtfuss" ? 0.15 : 0) : 0));
   let finalMaxHp = berechneFinalMaxHp();
   if (spielerHp > finalMaxHp) spielerHp = finalMaxHp;
 
@@ -1502,11 +1533,25 @@ function updateUI() {
       let teile = [];
       if (aff.schwaechen.length) teile.push(`<span style="color:#2ecc71; font-weight:bold;">▲ ${t("combat_weakness")}: ${aff.schwaechen.map(a => t("dmg_" + a.toLowerCase())).join(", ")}</span>`);
       if (aff.resistenzen.length) teile.push(`<span style="color:#e67e22; font-weight:bold;">▼ ${t("combat_resistance")}: ${aff.resistenzen.map(a => t("dmg_" + a.toLowerCase())).join(", ")}</span>`);
-      if (TOWER && towerAktMutator !== "keiner") teile.push(`<span style="color:#c39bd3; font-weight:bold;">⚙️ ${towerMutName(towerAktMutator)}</span> <span style="color:#9aa0a6;">— ${towerMutDesc(towerAktMutator)}</span>`);
-      affInfo.innerHTML = teile.join("<br>"); affInfo.style.display = "block";
-    } else if (TOWER && towerAktMutator !== "keiner") {
-      affInfo.innerHTML = `<span style="color:#c39bd3; font-weight:bold;">⚙️ ${towerMutName(towerAktMutator)}</span> <span style="color:#9aa0a6;">— ${towerMutDesc(towerAktMutator)}</span>`; affInfo.style.display = "block";
+      affInfo.innerHTML = teile.join("<br>"); affInfo.style.display = teile.length ? "block" : "none";
     } else { affInfo.style.display = "none"; }
+
+    // Tower: Ebenen-Leiste oben (Floor-Nummer + Effekt der ganzen Ebene)
+    let floorBar = document.getElementById("tower-floor-bar");
+    if (floorBar) {
+      if (TOWER) {
+        document.getElementById("tower-floor-label").innerText = "🏯 " + t("tower_akt", { n: towerAkt }).toUpperCase();
+        let fx = document.getElementById("tower-floor-effect");
+        if (towerAktMutator && towerAktMutator !== "keiner") {
+          fx.innerHTML = '<span class="fx-name" style="color:' + towerEffektFarbe(towerAktMutator) + ';">⚙️ ' + towerMutName(towerAktMutator) + '</span> <span class="fx-desc">— ' + towerMutDesc(towerAktMutator) + '</span>';
+        } else {
+          fx.innerHTML = '<span class="fx-calm">' + t("tower_mut_keiner_n") + '</span>';
+        }
+        floorBar.style.display = "flex";
+      } else {
+        floorBar.style.display = "none";
+      }
+    }
 
     if (TOWER) document.getElementById("enemy-img").src = towerBossBild || "";
     else if (aktuellerKnotenTyp === 15) document.getElementById("enemy-img").src = bilderDatenbankBosse[gegnerName] || "images/icons/fort-nightreign-full.jpg";
@@ -1788,6 +1833,7 @@ function spielerAngriff() {
   let finalDmg = Math.round((baseWeaponDmg + runeDmgBonus) * finalDmgMultiplier);
   let bossMod = gibBossSchadensModifikator(); if (bossMod !== 0) finalDmg = Math.round(finalDmg * (1 + bossMod));
   if (TOWER) finalDmg = Math.round(finalDmg * towerTreeDmgMult());   // Aufstiegsbaum: Henkersschlag
+  if (TOWER && towerAktMutator === "geschliffen") finalDmg = Math.round(finalDmg * 1.20);   // Ebenen-Effekt: Geschliffen
 
   let warBurst = false; let warBonus = false;
   if (nextHitBonusDamage) { finalDmg = Math.round(finalDmg * 1.3); nextHitBonusDamage = false; warBonus = true; }
@@ -1837,7 +1883,7 @@ function spielerAngriff() {
 
     enemyWrapper.style.transform = "translateX(-40px)"; let runeRollBonus = aktiveRune === "godrick" ? 0.15 : 0.0;
     if (dungeonBuffRemainingCombats > 0 && activeDungeonBuff === "dodge") runeRollBonus += 0.15;
-    let finaleAusweichChance = Math.min(hardMode ? 0.65 : 0.75, basisAusweichChance + tStats.extraRolle + runeRollBonus + (TOWER ? towerTreeDodge() : 0));
+    let finaleAusweichChance = Math.min(hardMode ? 0.65 : 0.75, basisAusweichChance + tStats.extraRolle + runeRollBonus + (TOWER ? towerTreeDodge() + (towerAktMutator === "leichtfuss" ? 0.15 : 0) : 0));
     let wuerfel = Math.random(); let ausgewichen = wuerfel < finaleAusweichChance;
 
     setTimeout(() => {
@@ -1875,7 +1921,7 @@ function spielerHeilen() {
       }
       let runeRollBonus = aktiveRune === "godrick" ? 0.15 : 0.0;
       if (dungeonBuffRemainingCombats > 0 && activeDungeonBuff === "dodge") runeRollBonus += 0.15;
-      let finaleAusweichChance = Math.min(hardMode ? 0.65 : 0.75, basisAusweichChance + tStats.extraRolle + runeRollBonus + (TOWER ? towerTreeDodge() : 0));
+      let finaleAusweichChance = Math.min(hardMode ? 0.65 : 0.75, basisAusweichChance + tStats.extraRolle + runeRollBonus + (TOWER ? towerTreeDodge() + (towerAktMutator === "leichtfuss" ? 0.15 : 0) : 0));
       let wuerfel = Math.random(); let ausgewichen = wuerfel < finaleAusweichChance;
 
       if (ausgewichen) { playerWrapper.classList.add("player-rolling"); zeigeFloatingZahl(playerWrapper, t("float_dodged"), "dmg-dodge"); document.getElementById("battle-log").innerText += t("heal_roll_success"); updateUI(); } 
@@ -1972,19 +2018,36 @@ function towerBaueElementTbl(istBoss) {
 }
 
 // Mutator-Pool. Manche helfen dir, manche fordern dich – jede Ebene ein anderer.
-const TOWER_MUTATOREN = ["keiner","raserei","zerbrechlich","eisenhaut","versiegelt","aderlass","gier"];
-function towerMutatorRollen(istBoss) {
-  // Ruhige Ebene 1 und alle Boss-Ebenen ohne "versiegelt" (zu hart) – sonst zufällig.
-  if (aktuelleEbene === 1) return "keiner";
-  let pool = TOWER_MUTATOREN.slice();
-  if (istBoss) pool = pool.filter(m => m !== "versiegelt");
-  // 25% Chance auf eine ruhige Ebene, sonst echter Mutator
-  if (Math.random() < 0.25) return "keiner";
-  let echte = pool.filter(m => m !== "keiner");
-  return echte[Math.floor(Math.random() * echte.length)];
+// Ebenen-Effekte: gelten für die GANZE Ebene (einmal pro Akt gewürfelt), 50% Chance.
+// tone: "good" = positiv, "bad" = negativ, "mixed" = Vor- und Nachteil.
+const TOWER_EFFEKTE = {
+  raserei:      "bad",
+  eisenhaut:    "bad",
+  versiegelt:   "bad",
+  aderlass:     "good",
+  geschliffen:  "good",
+  goldader:     "good",
+  leichtfuss:   "good",
+  gier:         "mixed",
+  zerbrechlich: "mixed"
+};
+const TOWER_EFFEKT_LISTE = Object.keys(TOWER_EFFEKTE);
+function towerEffektTone(m) { return TOWER_EFFEKTE[m] || "neutral"; }
+function towerEffektRollen() {
+  if (towerAkt <= 1) return "keiner";                 // erste Ebene: ruhiger Einstieg
+  if (Math.random() < 0.50) return "keiner";          // 50% Chance auf gar keinen Effekt
+  return TOWER_EFFEKT_LISTE[Math.floor(Math.random() * TOWER_EFFEKT_LISTE.length)];
 }
 function towerMutName(m){ return t("tower_mut_" + m + "_n"); }
 function towerMutDesc(m){ return t("tower_mut_" + m + "_d"); }
+// Farbe des Ebenen-Effekts nach Tönung
+function towerEffektFarbe(m) {
+  let tone = towerEffektTone(m);
+  if (tone === "good") return "#54d98c";
+  if (tone === "bad")  return "#e06666";
+  if (tone === "mixed") return "#e8b84b";
+  return "#c39bd3";
+}
 // Gegner-Schadensmultiplikator aus aktivem Mutator (raserei greift erst unter 30% HP)
 function towerGegnerDmgMult() {
   let mult = 1.0;
@@ -2080,6 +2143,7 @@ function starteTowerRun() {
 
 // Nächsten Akt starten (frische Map, Spieler wurde bereits voll geheilt)
 function towerStarteAkt() {
+  towerAktMutator = towerEffektRollen();   // EIN Effekt für die ganze neue Ebene
   netzKarte = generiereTowerNetz();
   aktuelleEbene = 1; geloesieKnotenIds = []; aktuellerKnotenId = null; aktuellerKnotenTyp = 0;
   imKampf = false; aktionsSperre = false;
@@ -2122,7 +2186,7 @@ function towerSetupKampf(typ, reihe) {
 
   towerAktuellerBoss = istBoss;
   towerElementTbl = null;
-  towerAktMutator = towerMutatorRollen(istBoss);
+  // Effekt gilt für die ganze Ebene (in towerStarteAkt gewürfelt) – hier NICHT neu würfeln.
 
   gegnerName  = gegner.n;
   gegnerMaxHp = werte.hp;
@@ -2144,8 +2208,7 @@ function towerSetupKampf(typ, reihe) {
   img.onerror = function () { this.onerror = null; if (gegner.fallback) { towerBossBild = gegner.fallback; this.src = gegner.fallback; } else this.style.display = "none"; };
   document.getElementById("arena-enemy-name").innerText = gegnerNameLoc(gegnerName);
   let tag = istBoss ? "👑 " : (istElite ? "⚔️ " : "🗡️ ");
-  let mutTxt = towerAktMutator !== "keiner" ? "  ⚙️ " + towerMutName(towerAktMutator) : "";
-  document.getElementById("battle-log").innerText = tag + t("tower_akt", { n: towerAkt }) + " · " + gegnerNameLoc(gegnerName) + "!" + mutTxt;
+  document.getElementById("battle-log").innerText = tag + gegnerNameLoc(gegnerName) + "!";
   speichereRun(); updateUI();
 }
 
@@ -2189,20 +2252,26 @@ function towerShopGeneriere(ebene) {
 }
 function oeffneTowerShop(ebene) {
   let overlay = document.getElementById("popup-overlay"), content = document.getElementById("popup-content");
-  let karten = towerShopAngebote.map(function (a, i) {
-    let leistbar = !a.gekauft && towerScherben >= a.preis;
-    let farbe = a.gekauft ? "#555" : (leistbar ? "#2ecc71" : "#a33");
-    let click = leistbar ? ' onclick="towerShopKauf(' + i + ')"' : "";
-    let status = a.gekauft ? '<span style="color:#2ecc71;">✓ ' + t("tower_shop_bought") + '</span>' : '<span style="color:#d4af37;">' + a.preis + ' 🔹</span>';
-    return '<div' + click + ' style="border:1px solid ' + (leistbar ? "#2ecc71" : "#3a3a3a") + '; border-radius:6px; padding:9px 10px; margin-bottom:8px; background:rgba(0,0,0,0.35); opacity:' + (a.gekauft ? "0.5" : "1") + '; cursor:' + (leistbar ? "pointer" : "default") + '; display:flex; justify-content:space-between; align-items:center; font-family:sans-serif; text-align:left;">' +
-      '<span style="font-size:0.86rem; color:#eee;">' + a.icon + ' <b>' + t("shop_" + a.id) + '</b><br><span style="font-size:0.72rem; color:#9aa0a6;">' + t("shop_" + a.id + "_d") + '</span></span>' +
-      '<span style="font-size:0.78rem; white-space:nowrap; margin-left:8px;">' + status + '</span></div>';
+  let rows = towerShopAngebote.map(function (a, i) {
+    let buyable = !a.gekauft && towerScherben >= a.preis;
+    let cls = a.gekauft ? "done" : (buyable ? "buyable" : "locked");
+    let click = buyable ? ' onclick="towerShopKauf(' + i + ')"' : "";
+    let preis = a.gekauft
+      ? '<span class="tshop-price bought">✓ ' + t("tower_shop_bought") + '</span>'
+      : '<span class="tshop-price ' + (buyable ? "ok" : "no") + '">🔹 ' + a.preis + '</span>';
+    return '<div class="tshop-row ' + cls + '"' + click + '>' +
+             '<span class="tshop-ico">' + a.icon + '</span>' +
+             '<span class="tshop-body"><span class="tshop-name">' + t("shop_" + a.id) + '</span><br>' +
+             '<span class="tshop-desc">' + t("shop_" + a.id + "_d") + '</span></span>' +
+             preis +
+           '</div>';
   }).join("");
   content.innerHTML =
-    '<h3 style="color:#d4af37; font-size:1.4rem; margin-top:0; letter-spacing:2px; font-family:\'Mantinia\', serif;">⚒️ ' + t("tower_shop_title") + '</h3>' +
-    '<p style="color:#d4af37; font-size:0.95rem; font-family:sans-serif; margin:2px 0 10px; font-weight:bold;">🔹 ' + towerScherben + ' ' + t("tower_shards") + '</p>' +
-    karten +
-    '<button class="btn-modal-action" style="margin-top:6px; border-color:#2ecc71; color:#2ecc71;" onclick="towerNodeWeiter()">' + t("tower_tree_continue") + '</button>';
+    '<div class="tshop-head"><h3 class="tshop-title">⚒️ ' + t("tower_shop_title") + '</h3>' +
+      '<span class="tshop-bal">🔹 ' + towerScherben + '</span></div>' +
+    '<p class="tshop-sub">' + t("tower_shop_sub") + '</p>' +
+    '<div class="tshop-list">' + rows + '</div>' +
+    '<button class="tshop-leave" onclick="towerNodeWeiter()">' + t("tower_shop_leave") + '</button>';
   overlay.style.display = "flex";
 }
 function towerShopKauf(i) {
@@ -2259,6 +2328,8 @@ function towerSiegBehandeln() {
   let basis = towerAktuellerBoss ? 70 : (aktuellerKnotenTyp === 1 ? 30 : 16);
   let gewinn = Math.round(basis + towerAkt * 6 + aktuelleEbene * 3);
   if (towerAktMutator === "gier") gewinn *= 2;
+  if (towerAktMutator === "goldader") gewinn = Math.round(gewinn * 1.5);
+  if (towerAktMutator === "versiegelt") gewinn = Math.round(gewinn * 1.4);   // „bessere Belohnung danach"
   towerScherben += gewinn;
 
   if (towerAktuellerBoss) { towerAktAbschluss(); return; }   // Akt-Boss besiegt -> Aufstieg
