@@ -27,7 +27,7 @@
   };
 
   const ONLINE = !!FIREBASE_CONFIG.apiKey && typeof firebase !== "undefined";
-  const PATCH = "1.4"; // aktuelle Spielversion – wird an neue Bestenlisten-Einträge angehängt
+  const PATCH = "1.5"; // aktuelle Spielversion – wird an neue Bestenlisten-Einträge angehängt
   let fbAuth = null, fbDB = null, currentUser = null;
   const userListeners = [];
 
@@ -66,6 +66,8 @@
     // --- Hard-/Challenge-Fortschritt ---
     hardModeCompletions: 0, hardNoDeath: false,
     challengesCompleted: {},
+    // --- Eldendex: entdeckte Katalog-IDs ---
+    discovered: {},
     // --- Bestwerte pro Patch: { "1_3": { normal:{score,stage,bosses}, hard:{...} }, "1_4": {...} } ---
     patchBest: {},
     bossKills: {}
@@ -76,6 +78,7 @@
     var s = Object.assign({}, DEFAULT_STATS, lsGet(STATS_KEY, {}));
     s.bossKills = Object.assign({}, s.bossKills || {});
     s.challengesCompleted = Object.assign({}, s.challengesCompleted || {});
+    s.discovered = Object.assign({}, s.discovered || {});
     s.patchBest = JSON.parse(JSON.stringify(s.patchBest || {}));
     return s;
   }
@@ -94,7 +97,98 @@
     "Maliketh, die Schwarze Klinge"
   ];
 
-  /* ====== 3) ACHIEVEMENTS (37) ====== */
+  /* ====== ELDENDEX-KATALOG (einzige Quelle der Wahrheit) ======
+     id-Schema: Waffen "w:Name", Rüstung "a:Name", Talismane "t:typ".
+     Gegner & Bosse werden über den exakten gegnerName entdeckt (id = Name). */
+  const ELDENDEX = [
+    // --- Waffen (mit Schaden & Schadensart) ---
+    { id:"w:Keule",                   cat:"weapons", name:"Keule",                   img:"images/weapons/keule.png",                dmg:11, types:["Normal"] },
+    { id:"w:Großaxt",                 cat:"weapons", name:"Großaxt",                 img:"images/weapons/grossaxt.png",             dmg:15, types:["Normal"] },
+    { id:"w:Uchigatana",              cat:"weapons", name:"Uchigatana",              img:"images/weapons/uchigatana.png",           dmg:14, types:["Normal"] },
+    { id:"w:Dolch",                   cat:"weapons", name:"Dolch",                   img:"images/weapons/dolch.png",                dmg:9,  types:["Normal"] },
+    { id:"w:Kurzschwert",             cat:"weapons", name:"Kurzschwert",             img:"images/weapons/kurzschwert.png",          dmg:11, types:["Normal"] },
+    { id:"w:Breitschwert",            cat:"weapons", name:"Breitschwert",            img:"images/weapons/breitschwert.png",         dmg:13, types:["Normal"] },
+    { id:"w:Rapier",                  cat:"weapons", name:"Rapier",                  img:"images/weapons/rapier.png",               dmg:11, types:["Normal"] },
+    { id:"w:Claymore",                cat:"weapons", name:"Claymore",                img:"images/weapons/claymore.png",             dmg:23, types:["Normal"] },
+    { id:"w:Bluthundreißzahn",        cat:"weapons", name:"Bluthundreißzahn",        img:"images/weapons/bluthundreisszahn.png",    dmg:25, types:["Normal"] },
+    { id:"w:Maltöter Großbeil",       cat:"weapons", name:"Maltöter Großbeil",       img:"images/weapons/maltoeter_grossbeil.png",  dmg:27, types:["Normal"] },
+    { id:"w:Großsterne",              cat:"weapons", name:"Großsterne",              img:"images/weapons/grosssterne.png",          dmg:35, types:["Normal"] },
+    { id:"w:Rostiger Anker",          cat:"weapons", name:"Rostiger Anker",          img:"images/weapons/rostiger_anker.png",       dmg:39, types:["Normal"] },
+    { id:"w:Blasphemous Blade",       cat:"weapons", name:"Blasphemous Blade",       img:"images/weapons/blasphemous_blade.png",    dmg:50, types:["Magie","Feuer"] },
+    { id:"w:Malenias Blade",          cat:"weapons", name:"Malenias Blade",          img:"images/weapons/malenias_blade.png",       dmg:68, types:["Normal"] },
+    { id:"w:Goldene Hellebarde",      cat:"weapons", name:"Goldene Hellebarde",      img:"images/weapons/goldene_hellebarde.png",   dmg:50, types:["Heilig","Normal"] },
+    { id:"w:Marikas Hammer",          cat:"weapons", name:"Marikas Hammer",          img:"images/weapons/marikas_hammer.png",       dmg:50, types:["Heilig","Magie"] },
+    { id:"w:Mohgwyns heiliger Speer", cat:"weapons", name:"Mohgwyns heiliger Speer", img:"images/weapons/mohgwyns_speer.png",       dmg:50, types:["Feuer","Normal"] },
+    { id:"w:Halo Scythe",             cat:"weapons", name:"Halo Scythe",             img:"images/weapons/halo_scythe.png",          dmg:52, types:["Heilig"] },
+    // --- Rüstungen ---
+    { id:"a:Albinauric Set",        cat:"armor", name:"Albinauric Set",        img:"images/armor/albinauric_set.png" },
+    { id:"a:Bloodhound Knight Set", cat:"armor", name:"Bloodhound Knight Set", img:"images/armor/bloodhound_set.png" },
+    { id:"a:Cleanrot Set",          cat:"armor", name:"Cleanrot Set",          img:"images/armor/cleanrotf.png" },
+    { id:"a:Godrick Soldier Set",   cat:"armor", name:"Godrick Soldier Set",   img:"images/armor/godrick_soldier_set.png" },
+    { id:"a:Briar Set",             cat:"armor", name:"Briar Set",             img:"images/armor/briar_set.png" },
+    { id:"a:Black Knife Set",       cat:"armor", name:"Black Knife Set",       img:"images/armor/black_knife_set.png" },
+    { id:"a:Haligtree Knight Set",  cat:"armor", name:"Haligtree Knight Set",  img:"images/armor/haligtree_knight_set.png" },
+    { id:"a:General Radahn Set",    cat:"armor", name:"General Radahn Set",    img:"images/armor/radahn_set.png" },
+    { id:"a:Crucible Axe Set",      cat:"armor", name:"Crucible Axe Set",      img:"images/armor/crucible_knight_set.png" },
+    // --- Talismane ---
+    { id:"t:hp",        cat:"talismans", name:"Crimson Amber Medallion", img:"images/talismans/crimson_amber_medallion.png" },
+    { id:"t:heal",      cat:"talismans", name:"Crimson Seed Talisman",   img:"images/talismans/crimson_seed_talisman.png" },
+    { id:"t:dmg",       cat:"talismans", name:"Axt Talisman",            img:"images/talismans/axe_talisman.png" },
+    { id:"t:dodge",     cat:"talismans", name:"Schildkröten Talisman",   img:"images/talismans/turtle_talisman.png" },
+    { id:"t:radagon",   cat:"talismans", name:"Radagon's Scarseal",      img:"images/talismans/radagons_scarseal.png" },
+    { id:"t:dungeater", cat:"talismans", name:"Dung Eater Medallion",    img:"images/talismans/dungeater_medallion.png" },
+    { id:"t:havel",     cat:"talismans", name:"Havel's Medallion",       img:"images/talismans/havels_medallion.png" },
+    // --- Gegner (id = exakter gegnerName) ---
+    { id:"Elite-Ritter",                          cat:"gegner", name:"Elite-Ritter",                          img:"images/Gegner/soldat.jpg" },
+    { id:"Bloodhound Knight",                     cat:"gegner", name:"Bloodhound Knight",                     img:"images/Gegner/LIMGRAVE_WAECHTER.webp" },
+    { id:"Nerijus",                               cat:"gegner", name:"Nerijus",                               img:"images/Gegner/LIMGRAVE_INVADER.webp" },
+    { id:"Böser Vogel",                           cat:"gegner", name:"Böser Vogel",                           img:"images/Gegner/CAELID_ELITE.jpg" },
+    { id:"Ekzykes",                               cat:"gegner", name:"Ekzykes",                               img:"images/Gegner/CAELID_WAECHTER.webp" },
+    { id:"Vyke",                                  cat:"gegner", name:"Vyke",                                  img:"images/Gegner/CAELID_INVADER.jpg" },
+    { id:"Leyndell Ritter",                       cat:"gegner", name:"Leyndell Ritter",                       img:"images/Gegner/LEYNDELL_ELITE.jpg" },
+    { id:"Omen",                                  cat:"gegner", name:"Omen",                                  img:"images/Gegner/LEYNDELL_WAECHTER.jpg" },
+    { id:"Eleonora",                              cat:"gegner", name:"Eleonora",                              img:"images/Gegner/LEYNDELL_INVADER.jpg" },
+    { id:"Feuermönch",                            cat:"gegner", name:"Feuermönch",                            img:"images/Gegner/MOUNTAINTOPS_ELITE.jpg" },
+    { id:"Troll",                                 cat:"gegner", name:"Troll",                                 img:"images/Gegner/MOUNTAINTOPS_WAECHTER.jpg" },
+    { id:"Okina",                                 cat:"gegner", name:"Okina",                                 img:"images/Gegner/MOUNTAINTOPS_INVADER.jpg" },
+    { id:"Bestienmensch of Farum Azula",          cat:"gegner", name:"Bestienmensch of Farum Azula",          img:"images/Gegner/FARUMAZULA_ELITE.jpg" },
+    { id:"Farum Azula Drache",                    cat:"gegner", name:"Farum Azula Drache",                    img:"images/Gegner/FARUMAZULA_WAECHTER.jpg" },
+    { id:"Anastasia",                             cat:"gegner", name:"Anastasia",                             img:"images/Gegner/FARUMAZULA_INVADER.jpg" },
+    { id:"Page",                                  cat:"gegner", name:"Page",                                  img:"images/Gegner/ASHENCAPITAL_ELITE.jpg" },
+    { id:"Königlicher Revenant",                  cat:"gegner", name:"Königlicher Revenant",                  img:"images/Gegner/ASHENCAPITAL_WAECHTER.jpg" },
+    { id:"Varre",                                 cat:"gegner", name:"Varre",                                 img:"images/Gegner/ASHENCAPITAL_INVADER.jpg" },
+    { id:"Haligtree Knight",                      cat:"gegner", name:"Haligtree Knight",                      img:"images/Gegner/haligtree_knight.webp" },
+    { id:"Putrid Avatar",                         cat:"gegner", name:"Putrid Avatar",                         img:"images/Gegner/putrid_avatar.webp" },
+    { id:"Millicent",                             cat:"gegner", name:"Millicent",                             img:"images/Gegner/millicent.webp" },
+    { id:"Beastman of Farum Azula",               cat:"gegner", name:"Beastman of Farum Azula",               img:"images/Gegner/miniboss_beastman.jpg" },
+    { id:"Cleanrot Knight",                       cat:"gegner", name:"Cleanrot Knight",                       img:"images/Gegner/miniboss_cleanrot_knight.png" },
+    { id:"Omenkiller & Miranda the Blighted Bloom", cat:"gegner", name:"Omenkiller & Miranda",                img:"images/Gegner/miniboss_omenkiller.jpg" },
+    { id:"Erdtree Avatar",                        cat:"gegner", name:"Erdtree Avatar",                        img:"images/Gegner/miniboss_erdtree_avatar.webp" },
+    { id:"Stray Mimic Tear",                      cat:"gegner", name:"Stray Mimic Tear",                      img:"images/starter/tarnished_ritter.webp" },
+    { id:"Dragonkin Soldier",                     cat:"gegner", name:"Dragonkin Soldier",                     img:"images/Gegner/miniboss_dragonkin_soldier.png" },
+    { id:"Putrid Tree Spirit",                    cat:"gegner", name:"Putrid Tree Spirit",                    img:"images/Gegner/putrid_tree_spirit.webp" },
+    { id:"Dungeon Skelett",                       cat:"gegner", name:"Dungeon Skelett",                       img:"images/Gegner/skeleton.webp" },
+    // --- Bosse (id = exakter gegnerName) ---
+    { id:"Godrick, der Verpflanzte",          cat:"bosse", name:"Godrick, der Verpflanzte",          img:"images/bosse/godrick.webp" },
+    { id:"Sternengeißel Radahn",              cat:"bosse", name:"Sternengeißel Radahn",              img:"images/bosse/radahn.webp" },
+    { id:"Morgott, der Omenkönig",            cat:"bosse", name:"Morgott, der Omenkönig",            img:"images/bosse/Morgott.webp" },
+    { id:"Feuerriese",                        cat:"bosse", name:"Feuerriese",                        img:"images/bosse/firegiant.avif" },
+    { id:"Maliketh, die Schwarze Klinge",     cat:"bosse", name:"Maliketh, die Schwarze Klinge",     img:"images/bosse/maliketh.jpg" },
+    { id:"Gideon Ofnir, der Allwissende",     cat:"bosse", name:"Gideon Ofnir, der Allwissende",     img:"images/bosse/gideon.webp" },
+    { id:"Godfrey, der Erste Eldenlord",      cat:"bosse", name:"Godfrey, der Erste Eldenlord",      img:"images/bosse/godfrey.webp" },
+    { id:"Radagon von der Goldenen Ordnung",  cat:"bosse", name:"Radagon von der Goldenen Ordnung",  img:"images/bosse/radagon.jpg" },
+    { id:"Eldenbiest",                        cat:"bosse", name:"Eldenbiest",                        img:"images/bosse/eldenbeast.jpg" },
+    { id:"Loretta, Knight of the Haligtree",  cat:"bosse", name:"Loretta, Knight of the Haligtree",  img:"images/bosse/loretta-knight-of-haligtree.jpg" },
+    { id:"Commander Niall",                   cat:"bosse", name:"Commander Niall",                   img:"images/bosse/commander-niall-elden-ring-wiki.jpg" },
+    { id:"Malenia, Blade of Miquella",        cat:"bosse", name:"Malenia, Blade of Miquella",        img:"images/bosse/maleniap1.webp" },
+    { id:"Malenia, Goddess of Rot",           cat:"bosse", name:"Malenia, Goddess of Rot",           img:"images/bosse/malenia-2nd-phase-flying.avif" },
+    { id:"Blaidd, der Halbwolf",              cat:"bosse", name:"Blaidd, der Halbwolf",              img:"images/Gegner/blaidd.avif" },
+    { id:"Cemetery Shade",                    cat:"bosse", name:"Cemetery Shade",                    img:"images/bosse/catacomb_boss.jpg" },
+    { id:"Promised Consort Radahn",           cat:"bosse", name:"Promised Consort Radahn",           img:"images/bosse/pcr.webp" }
+  ];
+  const ELDENDEX_IDS = ELDENDEX.map(function (e) { return e.id; });
+
+  /* ====== 3) ACHIEVEMENTS (41) ====== */
   const ACHIEVEMENTS = [
     /* --- Kämpfe --- */
     { id: "first_win",  name: "Erster Sieg",            icon: "⚔️", desc: "Gewinne deinen ersten Kampf.",            check: s => s.fightsWon >= 1 },
@@ -137,7 +231,14 @@
     /* --- Challenges --- */
     { id: "challenge_auto",      name: "Zuschauer",        icon: "👁️", desc: "Schließe einen Auto-Battle-Run ab.", check: s => !!(s.challengesCompleted && s.challengesCompleted.autobattle) },
     { id: "challenge_noarmor",   name: "Nacktläufer",      icon: "🏃", desc: "Schließe einen No-Armor-Run ab.",     check: s => !!(s.challengesCompleted && s.challengesCompleted.noarmor) },
-    { id: "challenge_noblaidd",  name: "Einsamer Wolf",    icon: "🐺", desc: "Schließe einen No-Blaidd-Run ab.",    check: s => !!(s.challengesCompleted && s.challengesCompleted.noblaidd) }
+    { id: "challenge_noblaidd",  name: "Einsamer Wolf",    icon: "🐺", desc: "Schließe einen No-Blaidd-Run ab.",    check: s => !!(s.challengesCompleted && s.challengesCompleted.noblaidd) },
+    /* --- Battle Tower --- */
+    { id: "tower_climb",  name: "Turmaufstieg",       icon: "🏯", desc: "Betritt den Battle Tower.",          check: s => (s.towerBestFloor || 0) >= 1 },
+    { id: "tower_10",     name: "Aufstrebend",        icon: "🪜", desc: "Erreiche Akt 5 im Battle Tower.", check: s => (s.towerBestFloor || 0) >= 5 },
+    { id: "tower_25",     name: "Turmwächter",        icon: "🗼", desc: "Erreiche Akt 10 im Battle Tower.", check: s => (s.towerBestFloor || 0) >= 10 },
+    { id: "tower_master", name: "Meister des Turms",  icon: "👑", desc: "Bezwinge das komplette Boss-Gauntlet des Battle Tower.", check: s => !!(s.challengesCompleted && s.challengesCompleted.tower) },
+    /* --- Eldendex --- */
+    { id: "true_100", name: "True 100%", icon: "📖", desc: "Entdecke jeden Eintrag im Eldendex.", check: s => ELDENDEX_IDS.every(function (id) { return s.discovered && s.discovered[id]; }) }
   ];
 
   // Übersetzt Name/Beschreibung eines Achievements via i18n (Fallback: hartkodiert)
@@ -174,8 +275,11 @@
   function runBump(key, n) { var r = getRun(); r[key] = (r[key] || 0) + (n || 1); saveRun(r); }
 
   function normDiff(d) { return d === "hard" ? "hard" : "normal"; }
-  function patchKey(p) { return String(p || PATCH).replace(/\./g, "_"); } // "1.4" -> "1_4"
-  function leererPatchSlot() { return { normal: { score: 0, stage: 0, bosses: 0 }, hard: { score: 0, stage: 0, bosses: 0 } }; }
+  // Bestenlisten-Kategorien: Basis (normal/hard), Battle Tower und je Challenge eine eigene Liste.
+  const LB_KATEGORIEN = ["normal", "hard", "tower", "noarmor", "noblaidd", "autobattle", "haligtree"];
+  function normCat(c) { return LB_KATEGORIEN.indexOf(c) >= 0 ? c : "normal"; }
+  function patchKey(p) { return String(p || PATCH).replace(/\./g, "_"); } // "1.5" -> "1_5"
+  function leererPatchSlot() { var o = {}; LB_KATEGORIEN.forEach(function (c) { o[c] = { score: 0, stage: 0, bosses: 0 }; }); return o; }
 
   /* ====== 5) ÖFFENTLICHE API (window.ER) ====== */
   const ER = {
@@ -183,9 +287,10 @@
     isOnline: function () { return ONLINE; },
 
     /* --- Run-Lebenszyklus --- */
-    startRun: function (difficulty) {
+    startRun: function (difficulty, category) {
       var diff = normDiff(difficulty);
-      saveRun({ stage: 1, bosses: 0, fights: 0, difficulty: diff, hadDeath: false });
+      var cat = normCat(category || diff);
+      saveRun({ stage: 1, bosses: 0, fights: 0, difficulty: diff, category: cat, hadDeath: false });
       bump("runsStarted");
       setMax("furthestStage", 1);
       setMax(diff === "hard" ? "furthestStageHard" : "furthestStageNormal", 1);
@@ -193,6 +298,7 @@
     endRun: function () {
       var r = getRun();
       var diff = normDiff(r.difficulty);
+      var cat = normCat(r.category || diff);
       var score = (r.stage || 0) * 1000 + (r.bosses || 0) * 200 + (r.fights || 0) * 10;
       // kombiniert (für die Stat-Anzeige) ...
       setMax("bestScore", score);
@@ -200,19 +306,20 @@
       // ... getrennt nach Schwierigkeit (Stat-Anzeige/Cloud-Kompatibilität) ...
       setMax(diff === "hard" ? "bestScoreHard" : "bestScoreNormal", score);
       setMax(diff === "hard" ? "bestRunBossesHard" : "bestRunBossesNormal", r.bosses || 0);
-      // ... und pro Patch + Schwierigkeit (das ist die Quelle für die Bestenliste)
+      // ... und pro Patch + KATEGORIE (Quelle der jeweiligen Bestenliste)
       if (score > 0) {
         var s = getStats();
         var pk = patchKey(PATCH);
         s.patchBest = s.patchBest || {};
         if (!s.patchBest[pk]) s.patchBest[pk] = leererPatchSlot();
-        var slot = s.patchBest[pk][diff];
+        if (!s.patchBest[pk][cat]) s.patchBest[pk][cat] = { score: 0, stage: 0, bosses: 0 };
+        var slot = s.patchBest[pk][cat];
         if (score > (slot.score || 0)) { slot.score = score; slot.stage = r.stage || 0; slot.bosses = r.bosses || 0; }
         saveStats(s);
       }
-      submitToBoard(score, { stage: r.stage || 0, bosses: r.bosses || 0, fights: r.fights || 0, difficulty: diff });
-      // Zähler zurücksetzen – Schwierigkeit & hadDeath bleiben bis zum nächsten startRun erhalten
-      saveRun({ stage: 0, bosses: 0, fights: 0, difficulty: diff, hadDeath: r.hadDeath });
+      submitToBoard(score, { stage: r.stage || 0, bosses: r.bosses || 0, fights: r.fights || 0, difficulty: diff, category: cat });
+      // Zähler zurücksetzen – Schwierigkeit, Kategorie & hadDeath bleiben bis zum nächsten startRun erhalten
+      saveRun({ stage: 0, bosses: 0, fights: 0, difficulty: diff, category: cat, hadDeath: r.hadDeath });
       return score;
     },
 
@@ -231,6 +338,13 @@
     gameCompleted: function () { bump("gamesCompleted"); ER.endRun(); },
     flaskDrunk:   function () { bump("flasksDrunk"); },
     reachStage:   function (n) { if (n) { setMax("furthestStage", n); var r = getRun(); var diff = normDiff(r.difficulty); setMax(diff === "hard" ? "furthestStageHard" : "furthestStageNormal", n); if (n > (r.stage || 0)) { r.stage = n; saveRun(r); } } },
+    towerReached: function (n) {
+      if (!n) return;
+      setMax("towerBestFloor", n);
+      var r = getRun();
+      if (r.category === "tower" && n > (r.stage || 0)) { r.stage = n; saveRun(r); }
+    },
+    bestTower: function () { return getStats().towerBestFloor || 0; },
 
     /* --- Hard Mode & Challenges --- */
     hardCompleted: function () {
@@ -249,6 +363,39 @@
       checkAchievements();
     },
 
+    /* --- Eldendex --- */
+    ELDENDEX: ELDENDEX,
+    discover: function (id) {
+      if (!id) return;
+      var s = getStats();
+      if (s.discovered[id]) return; // schon entdeckt -> idempotent, kein Cloud-Spam
+      s.discovered[id] = true;
+      saveStats(s);
+      checkAchievements();
+      cloudPush();
+      // Neuer Eldendex-Eintrag? -> UI benachrichtigen (Toast)
+      if (typeof window !== "undefined" && typeof window.onERDiscovery === "function") {
+        for (var i = 0; i < ELDENDEX.length; i++) {
+          if (ELDENDEX[i].id === id) { try { window.onERDiscovery(ELDENDEX[i]); } catch (e) {} break; }
+        }
+      }
+    },
+    getDex: function () {
+      var s = getStats();
+      var disc = s.discovered || {};
+      var bossKills = s.bossKills || {};
+      var cats = {}; var total = 0, found = 0;
+      ELDENDEX.forEach(function (e) {
+        // auch entdeckt, wenn der Gegner/Boss bereits getötet wurde (für bestehende Spielstände)
+        var seen = !!disc[e.id] || (bossKills[e.id] > 0);
+        if (!cats[e.cat]) cats[e.cat] = { items: [], found: 0, total: 0 };
+        cats[e.cat].items.push({ id:e.id, name:e.name, cat:e.cat, img:e.img, dmg:e.dmg, types:e.types, seen:seen });
+        cats[e.cat].total++; total++;
+        if (seen) { cats[e.cat].found++; found++; }
+      });
+      return { cats: cats, total: total, found: found };
+    },
+
     /* --- Abfragen --- */
     getStats: getStats,
     getAchievements: function () { var u = getUnlocked(); return ACHIEVEMENTS.map(function (a) { var l = locAch(a); l.unlocked = u.indexOf(a.id) !== -1; return l; }); },
@@ -265,14 +412,12 @@
     },
     signOut: function () { if (fbAuth) return fbAuth.signOut(); return Promise.resolve(); },
 
-    /* --- Bestenliste (getrennt nach Patch + Schwierigkeit) --- */
-    getLeaderboard: function (limit, cb, difficulty, patch) {
+    /* --- Bestenliste (getrennt nach Patch + Kategorie) --- */
+    getLeaderboard: function (limit, cb, category, patch) {
       limit = limit || 20;
-      var diff = normDiff(difficulty);
+      var cat = normCat(category);
       var pk = patchKey(patch || PATCH);
-      var scoreField = "lb." + pk + "." + (diff === "hard" ? "hardScore" : "normalScore");
-      var stageField = "lb." + pk + "." + (diff === "hard" ? "hardStage" : "normalStage");
-      var bossField  = "lb." + pk + "." + (diff === "hard" ? "hardBosses" : "normalBosses");
+      var scoreField = "lb." + pk + "." + cat + "Score";
       if (ONLINE && fbDB) {
         fbDB.collection("users").orderBy(scoreField, "desc").limit(limit).get()
           .then(function (snap) {
@@ -280,34 +425,35 @@
             snap.forEach(function (d) {
               var x = d.data();
               var box = (x.lb && x.lb[pk]) ? x.lb[pk] : {};
-              var sc = (diff === "hard" ? box.hardScore : box.normalScore) || 0;
+              var sc = box[cat + "Score"] || 0;
               if (sc <= 0) return; // keine leeren Einträge im jeweiligen Board
               rows.push({
                 name: x.displayName || "Befleckter",
                 score: sc,
-                stage: (diff === "hard" ? box.hardStage : box.normalStage) || 0,
-                bosses: (diff === "hard" ? box.hardBosses : box.normalBosses) || 0,
+                stage: box[cat + "Stage"] || 0,
+                bosses: box[cat + "Bosses"] || 0,
                 photo: x.photoURL || "",
                 patch: pk.replace(/_/g, ".")
               });
             });
             cb(rows, true);
           })
-          .catch(function (e) { console.warn("[ER] Bestenliste online fehlgeschlagen, lokal:", e); cb(localBoard(limit, diff, pk), false); });
+          .catch(function (e) { console.warn("[ER] Bestenliste online fehlgeschlagen, lokal:", e); cb(localBoard(limit, cat, pk), false); });
       } else {
-        cb(localBoard(limit, diff, pk), false);
+        cb(localBoard(limit, cat, pk), false);
       }
     }
   };
 
   /* ====== 6) LOKALE BESTENLISTE ====== */
-  function localBoard(limit, difficulty, patch) {
-    var diff = normDiff(difficulty);
+  function eintragKategorie(x) { return x.category || normDiff(x.difficulty); }   // Legacy-Einträge -> Schwierigkeit
+  function localBoard(limit, category, patch) {
+    var cat = normCat(category);
     var pk = patchKey(patch || PATCH);
     var b = lsGet(BOARD_KEY, []).filter(function (x) {
       // Einträge ohne Patch-Feld stammen aus der Zeit vor v1.4 -> als "1.3" behandeln
       var entryPk = patchKey(x.patch || "1.3");
-      return normDiff(x.difficulty) === diff && entryPk === pk;
+      return eintragKategorie(x) === cat && entryPk === pk;
     });
     b.sort(function (a, c) { return c.score - a.score; });
     return b.slice(0, limit);
@@ -315,12 +461,12 @@
   function submitToBoard(score, meta) {
     if (score <= 0) return;
     var name = ER.getPlayerName();
-    var diff = normDiff(meta.difficulty);
-    // lokal – ein bester Eintrag pro Name UND Schwierigkeit
+    var cat = normCat(meta.category || normDiff(meta.difficulty));
+    // lokal – ein bester Eintrag pro Name UND Kategorie
     var b = lsGet(BOARD_KEY, []);
-    var mine = b.find(function (x) { return x.name === name && x.local && normDiff(x.difficulty) === diff; });
+    var mine = b.find(function (x) { return x.name === name && x.local && eintragKategorie(x) === cat; });
     if (mine) { if (score > mine.score) { mine.score = score; mine.stage = meta.stage; mine.bosses = meta.bosses; mine.patch = PATCH; } }
-    else { b.push({ name: name, score: score, stage: meta.stage, bosses: meta.bosses, difficulty: diff, patch: PATCH, local: true }); }
+    else { b.push({ name: name, score: score, stage: meta.stage, bosses: meta.bosses, difficulty: normDiff(meta.difficulty), category: cat, patch: PATCH, local: true }); }
     lsSet(BOARD_KEY, b);
     // cloud
     cloudPush();
@@ -328,21 +474,22 @@
 
   /* ====== 7) CLOUD-SYNC (Firestore) ====== */
   // Baut aus stats.patchBest die "lb"-Map, nach der die Online-Bestenliste sortiert.
+  // Enthält je Kategorie <cat>Score/<cat>Stage/<cat>Bosses (normalScore/hardScore bleiben abwärtskompatibel).
   function baueLbMap(s) {
     var lb = {};
     var pb = s.patchBest || {};
     Object.keys(pb).forEach(function (pk) {
-      var slot = pb[pk] || {};
-      var n = slot.normal || {}, h = slot.hard || {};
-      lb[pk] = {
-        normalScore: n.score || 0, normalStage: n.stage || 0, normalBosses: n.bosses || 0,
-        hardScore: h.score || 0,   hardStage: h.stage || 0,   hardBosses: h.bosses || 0
-      };
+      var slot = pb[pk] || {}; var box = {};
+      LB_KATEGORIEN.forEach(function (cat) {
+        var c = slot[cat] || { score: 0, stage: 0, bosses: 0 };
+        box[cat + "Score"] = c.score || 0; box[cat + "Stage"] = c.stage || 0; box[cat + "Bosses"] = c.bosses || 0;
+      });
+      lb[pk] = box;
     });
     return lb;
   }
 
-  // Vereint zwei patchBest-Maps: pro Patch + Schwierigkeit gewinnt der höhere Score.
+  // Vereint zwei patchBest-Maps: pro Patch + Kategorie gewinnt der höhere Score.
   function mergePatchBest(localPB, cloudPB) {
     localPB = localPB || {}; cloudPB = cloudPB || {};
     var out = {}, keys = {};
@@ -351,11 +498,15 @@
     Object.keys(keys).forEach(function (pk) {
       var lSlot = localPB[pk] || {}, cSlot = cloudPB[pk] || {};
       out[pk] = {};
-      ["normal", "hard"].forEach(function (diff) {
-        var l = lSlot[diff] || { score: 0, stage: 0, bosses: 0 };
-        var c = cSlot[diff] || { score: 0, stage: 0, bosses: 0 };
+      // alle in beiden Slots vorkommenden Kategorien berücksichtigen
+      var cats = {}; LB_KATEGORIEN.forEach(function (c) { cats[c] = true; });
+      Object.keys(lSlot).forEach(function (c) { cats[c] = true; });
+      Object.keys(cSlot).forEach(function (c) { cats[c] = true; });
+      Object.keys(cats).forEach(function (cat) {
+        var l = lSlot[cat] || { score: 0, stage: 0, bosses: 0 };
+        var c = cSlot[cat] || { score: 0, stage: 0, bosses: 0 };
         var win = (l.score || 0) >= (c.score || 0) ? l : c;
-        out[pk][diff] = { score: win.score || 0, stage: win.stage || 0, bosses: win.bosses || 0 };
+        out[pk][cat] = { score: win.score || 0, stage: win.stage || 0, bosses: win.bosses || 0 };
       });
     });
     return out;
@@ -398,7 +549,7 @@
         // Merge: Zahlen -> Maximum, Objekte -> vereinen, Booleans -> ODER
         var merged = Object.assign({}, DEFAULT_STATS, local);
         Object.keys(DEFAULT_STATS).forEach(function (k) {
-          if (k === "bossKills" || k === "challengesCompleted") {
+          if (k === "bossKills" || k === "challengesCompleted" || k === "discovered") {
             var localObj = local[k] || {}, cloudObj = cs[k] || {};
             var mergedObj = Object.assign({}, cloudObj, localObj);
             Object.keys(cloudObj).forEach(function (kk) {
