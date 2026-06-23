@@ -215,7 +215,7 @@
 
   <div class="btn-row">
     <button class="btn-secondary" onclick="openModal('seelenschmiede')">
-      <span class="btn-icon">⚜️</span> <span id="btn-shop-text">Seelenschmiede</span><span id="btn-shop-souls" style="color:#cda34f;font-weight:bold;"></span>
+      <span class="btn-icon">⚜️</span> <span id="btn-shop-text">Roundtable</span><span id="btn-shop-souls" style="color:#cda34f;font-weight:bold;"></span>
     </button>
     <button class="btn-secondary" onclick="openModal('bestenliste')">
       <span class="btn-icon">🏆</span> <span id="btn-lb-text">Bestenliste</span>
@@ -367,7 +367,7 @@
 <div class="modal-bg" id="modal-seelenschmiede">
   <div class="modal-box">
     <button class="modal-close" onclick="closeModals()">&times;</button>
-    <div class="modal-title">⚜️ Seelenschmiede</div>
+    <div class="modal-title">⚜️ Roundtable</div>
     <div id="shop-souls-bar" style="text-align:center;font-family:sans-serif;margin-bottom:12px;"></div>
     <div id="shop-tabs" style="display:flex;gap:8px;margin-bottom:14px;"></div>
     <div id="shop-body"></div>
@@ -582,44 +582,98 @@
       grid.appendChild(cell);
     });
   }
-  /* ===== ⚜️ SEELENSCHMIEDE (Meta-Shop im Hauptmenü) ===== */
+  /* ===== ⚜️ ROUNDTABLE (Meta-Shop im Hauptmenü) ===== */
   var META_KEY = "eldenRogueMeta";
-  function metaDefault() { return { seelen:0, upgrades:{vitalitaet:0,schaerfe:0,flakon:0,wendigkeit:0,seelenfaenger:0}, unlockedWeapons:[], startWeapon:null, unlockedSkins:[], activeSkinId:null, activeSkinFilter:"" }; }
+  var DEFAULT_WEAPONS = ["Dolch","Kurzschwert","Breitschwert","Rapier","Claymore","Bluthundreißzahn","Maltöter Großbeil","Großsterne","Rostiger Anker","Blasphemous Blade"];
+  var DEFAULT_ARMOR = ["Albinauric Set","Cleanrot Set","Briar Set","Haligtree Knight Set"];
+  function metaDefault() { return { seelen:0, upgrades:{vitalitaet:0,schaerfe:0,wendigkeit:0,seelenfaenger:0,flakon:0}, unlockedWeapons: DEFAULT_WEAPONS.slice(), unlockedArmor: DEFAULT_ARMOR.slice(), unlockedSkins:[], activeSkinId:null, activeSkinFilter:"" }; }
   function ladeMeta() {
-    try { var m = JSON.parse(localStorage.getItem(META_KEY)); if (m && typeof m === "object") { var d = metaDefault(); d = Object.assign(d, m); d.upgrades = Object.assign(metaDefault().upgrades, m.upgrades||{}); return d; } } catch(e) {}
+    try { var m = JSON.parse(localStorage.getItem(META_KEY)); if (m && typeof m === "object") { var d = metaDefault(); var r = Object.assign(d, m); r.upgrades = Object.assign(metaDefault().upgrades, m.upgrades||{});
+      r.unlockedWeapons = Array.from(new Set(DEFAULT_WEAPONS.concat(Array.isArray(r.unlockedWeapons)?r.unlockedWeapons:[])));
+      r.unlockedArmor = Array.from(new Set(DEFAULT_ARMOR.concat(Array.isArray(r.unlockedArmor)?r.unlockedArmor:[])));
+      if (!Array.isArray(r.unlockedSkins)) r.unlockedSkins=[]; return r; } } catch(e) {}
     return metaDefault();
   }
   function speichereMeta(m) { try { localStorage.setItem(META_KEY, JSON.stringify(m)); } catch(e) {} }
   function shopL(de, en) { return (window.i18n && window.i18n.getLang && window.i18n.getLang() === "en") ? en : de; }
   var RARITY_COL = { common:"#9aa0a6", rare:"#4aa3ff", epic:"#a55eea", legendary:"#f1c40f" };
+  var RARITY_NAME = { common:["Gewöhnlich","Common"], rare:["Selten","Rare"], epic:["Episch","Epic"], legendary:["Legendär","Legendary"] };
 
+  /* CSS-Keyframes für die Truhen-Animation einmalig injizieren */
+  (function(){ if (document.getElementById("shop-anim-style")) return; var st=document.createElement("style"); st.id="shop-anim-style";
+    st.textContent="@keyframes chestShake{0%,100%{transform:rotate(0)}20%{transform:rotate(-9deg)}40%{transform:rotate(9deg)}60%{transform:rotate(-7deg)}80%{transform:rotate(7deg)}}@keyframes itemPop{0%{transform:scale(0) rotate(-25deg);opacity:0}60%{transform:scale(1.3) rotate(6deg);opacity:1}100%{transform:scale(1) rotate(0)}}@keyframes glowPulse{0%,100%{filter:drop-shadow(0 0 5px currentColor)}50%{filter:drop-shadow(0 0 22px currentColor)}}";
+    document.head.appendChild(st); })();
+
+  /* --- Upgrades --- */
   var SHOP_UPGRADES = [
-    { id:"vitalitaet",   icon:"❤️", max:10, baseCost:60,  de:["Vitalität","+15 Start-HP pro Stufe"],          en:["Vitality","+15 starting HP per level"] },
-    { id:"schaerfe",     icon:"🗡️", max:10, baseCost:80,  de:["Schärfe","+1 Start-Waffenstufe pro Stufe"],     en:["Sharpness","+1 starting weapon level per level"] },
-    { id:"flakon",       icon:"🧪", max:3,  baseCost:240, de:["Flakon","+1 Start-Flakon pro Stufe"],           en:["Flask","+1 starting flask per level"] },
-    { id:"wendigkeit",   icon:"💨", max:5,  baseCost:130, de:["Wendigkeit","+2% Start-Ausweichen pro Stufe"],  en:["Agility","+2% starting dodge per level"] },
-    { id:"seelenfaenger",icon:"✨", max:10, baseCost:100, de:["Seelenfänger","+10% Seelen pro Run pro Stufe"], en:["Soul Catcher","+10% souls per run per level"] }
+    { id:"vitalitaet",   icon:"❤️", max:10, baseCost:60,  de:["Leben","+15 Start-HP pro Stufe"],            en:["Life","+15 starting HP per level"] },
+    { id:"schaerfe",     icon:"🗡️", max:10, baseCost:80,  de:["Schaden","+1 Start-Waffenstufe pro Stufe"],   en:["Damage","+1 starting weapon level per level"] },
+    { id:"wendigkeit",   icon:"💨", max:4,  baseCost:130, de:["Rolle","+2,5% Start-Ausweichen pro Stufe"],   en:["Roll","+2.5% starting dodge per level"] },
+    { id:"seelenfaenger",icon:"✨", max:10, baseCost:100, de:["Seelenfang","+10% Seelen pro Run pro Stufe"], en:["Soul Gain","+10% souls per run per level"] },
+    { id:"flakon",       icon:"🧪", max:3,  baseCost:220, de:["Flakon","+1 Start-Flakon pro Stufe"],         en:["Flask","+1 starting flask per level"] }
   ];
   function upgradeKosten(u, level) { return Math.round(u.baseCost * (level+1) * (1 + level*0.35)); }
 
-  var SHOP_WEAPONS = [
-    { name:"Claymore",           basisDmg:23, rarity:"rare",      schadensarten:["Normal"],          cost:300 },
-    { name:"Maltöter Großbeil",  basisDmg:27, rarity:"rare",      schadensarten:["Normal"],          cost:380 },
-    { name:"Großsterne",         basisDmg:35, rarity:"epic",      schadensarten:["Normal"],          cost:700 },
-    { name:"Rostiger Anker",     basisDmg:39, rarity:"epic",      schadensarten:["Normal"],          cost:850 },
-    { name:"Blasphemous Blade",  basisDmg:50, rarity:"legendary", schadensarten:["Magie","Feuer"],   cost:1500 },
-    { name:"Goldene Hellebarde", basisDmg:50, rarity:"legendary", schadensarten:["Heilig","Normal"], cost:1500 },
-    { name:"Halo Scythe",        basisDmg:52, rarity:"legendary", schadensarten:["Heilig"],          cost:1900 }
+  /* --- Gacha-Truhen: alle Items + Standard-frei --- */
+  var ALL_WEAPONS = [
+    {name:"Dolch",dmg:9,rarity:"common",arten:["Normal"]},{name:"Kurzschwert",dmg:11,rarity:"common",arten:["Normal"]},{name:"Breitschwert",dmg:13,rarity:"common",arten:["Normal"]},{name:"Rapier",dmg:11,rarity:"common",arten:["Normal"]},
+    {name:"Claymore",dmg:23,rarity:"rare",arten:["Normal"]},{name:"Bluthundreißzahn",dmg:25,rarity:"rare",arten:["Normal"]},{name:"Maltöter Großbeil",dmg:27,rarity:"rare",arten:["Normal"]},
+    {name:"Großsterne",dmg:35,rarity:"epic",arten:["Normal"]},{name:"Rostiger Anker",dmg:39,rarity:"epic",arten:["Normal"]},
+    {name:"Blasphemous Blade",dmg:50,rarity:"legendary",arten:["Magie","Feuer"]},{name:"Malenias Blade",dmg:68,rarity:"legendary",arten:["Normal"]},{name:"Goldene Hellebarde",dmg:50,rarity:"legendary",arten:["Heilig","Normal"]},{name:"Marikas Hammer",dmg:50,rarity:"legendary",arten:["Heilig","Magie"]},{name:"Mohgwyns heiliger Speer",dmg:50,rarity:"legendary",arten:["Feuer","Normal"]},{name:"Halo Scythe",dmg:52,rarity:"legendary",arten:["Heilig"]}
   ];
+  var ARMOR_RED = { common:0.06, rare:0.10, epic:0.14, legendary:0.18 };
+  var ALL_ARMOR = [
+    {name:"Albinauric Set",rarity:"common"},{name:"Bloodhound Knight Set",rarity:"common"},
+    {name:"Cleanrot Set",rarity:"rare"},{name:"Godrick Soldier Set",rarity:"rare"},
+    {name:"Briar Set",rarity:"epic"},{name:"Black Knife Set",rarity:"epic"},
+    {name:"Haligtree Knight Set",rarity:"legendary"},{name:"General Radahn Set",rarity:"legendary"},{name:"Crucible Axe Set",rarity:"legendary"}
+  ];
+  var CHEST_COST = 300;
+  function lockedWeapons(m){ return ALL_WEAPONS.filter(function(w){ return m.unlockedWeapons.indexOf(w.name) < 0; }); }
+  function lockedArmor(m){ return ALL_ARMOR.filter(function(a){ return (m.unlockedArmor||[]).indexOf(a.name) < 0; }); }
 
+  function oeffneTruhe(typ) {
+    var m = ladeMeta();
+    var pool = typ === "waffe" ? lockedWeapons(m) : lockedArmor(m);
+    if (!pool.length || m.seelen < CHEST_COST) return;
+    m.seelen -= CHEST_COST;
+    var item = pool[Math.floor(Math.random() * pool.length)];
+    if (typ === "waffe") m.unlockedWeapons.push(item.name); else { if (!Array.isArray(m.unlockedArmor)) m.unlockedArmor=[]; m.unlockedArmor.push(item.name); }
+    speichereMeta(m);
+    chestReveal(typ, item);
+  }
+  window.oeffneTruhe = oeffneTruhe;
+
+  function chestReveal(typ, item) {
+    var body = document.getElementById("shop-body"); if (!body) return;
+    updateShopButtonSouls();
+    body.innerHTML = '<div style="text-align:center;padding:34px 0;">'
+      + '<div style="font-size:4.6rem;display:inline-block;animation:chestShake 0.5s ease-in-out 3;">📦</div>'
+      + '<div style="color:#cda34f;font-family:sans-serif;margin-top:12px;letter-spacing:1px;">' + shopL("Die Truhe öffnet sich…","The chest opens…") + '</div></div>';
+    setTimeout(function(){
+      var col = RARITY_COL[item.rarity];
+      var stats = typ === "waffe" ? ('⚔️ ' + item.dmg + ' · ' + item.arten.join("/"))
+        : ('🛡️ ' + Math.round(ARMOR_RED[item.rarity]*100) + '% ' + shopL("Schadensreduktion","damage reduction"));
+      body.innerHTML = '<div style="text-align:center;padding:20px 0;">'
+        + '<div style="font-size:0.72rem;color:' + col + ';text-transform:uppercase;letter-spacing:2px;">' + shopL("Neu freigeschaltet!","Newly unlocked!") + '</div>'
+        + '<div style="font-size:3.6rem;margin:8px 0;color:' + col + ';display:inline-block;animation:itemPop 0.6s ease-out, glowPulse 1.7s ease-in-out infinite;">' + (typ==="waffe"?'🗡️':'🛡️') + '</div>'
+        + '<div style="color:' + col + ';font-size:1.3rem;font-family:Georgia,serif;">' + item.name + '</div>'
+        + '<div style="color:#bbb;font-size:0.74rem;text-transform:uppercase;letter-spacing:1px;margin-top:2px;">' + shopL(RARITY_NAME[item.rarity][0],RARITY_NAME[item.rarity][1]) + '</div>'
+        + '<div style="color:#9aa0a6;font-size:0.85rem;margin-top:6px;">' + stats + '</div>'
+        + '<div style="color:#777;font-size:0.76rem;margin-top:12px;font-family:sans-serif;">' + shopL("Taucht ab jetzt als Beute in deinen Runs auf.","From now on it appears as loot in your runs.") + '</div>'
+        + '<button class="btn-modal-action" style="margin-top:16px;" onclick="renderShop()">' + shopL("Weiter","Continue") + '</button></div>';
+    }, 1650);
+  }
+
+  /* --- Skins (Platzhalter) --- */
   var SHOP_SKINS = [
-    { id:"none",    rarity:"common",    cost:0,    filter:"",                                                          de:["Standard","Default"] },
-    { id:"blut",    rarity:"rare",      cost:400,  filter:"hue-rotate(-35deg) saturate(1.7)",                          de:["Blutmond","Bloodmoon"] },
-    { id:"frost",   rarity:"rare",      cost:400,  filter:"hue-rotate(160deg) saturate(1.4) brightness(1.1)",          de:["Frostklinge","Frostblade"] },
-    { id:"gift",    rarity:"epic",      cost:750,  filter:"hue-rotate(85deg) saturate(1.8)",                           de:["Giftschwur","Venom Oath"] },
-    { id:"gold",    rarity:"epic",      cost:900,  filter:"sepia(1) saturate(3) hue-rotate(5deg) brightness(1.1)",     de:["Goldgeist","Golden Wraith"] },
-    { id:"void",    rarity:"legendary", cost:1400, filter:"invert(1) hue-rotate(180deg) contrast(1.1)",                de:["Leerentänzer","Voidwalker"] },
-    { id:"radiant", rarity:"legendary", cost:1800, filter:"brightness(1.25) saturate(1.5) drop-shadow(0 0 7px gold)",  de:["Strahlenfürst","Radiant Lord"] }
+    { id:"none",  emoji:"🧍", rarity:"common",    cost:0,    de:["Standard","Default"] },
+    { id:"s_fire",emoji:"🔥", rarity:"rare",      cost:400,  de:["Platzhalter Feuer","Placeholder Fire"] },
+    { id:"s_ice", emoji:"❄️", rarity:"rare",      cost:400,  de:["Platzhalter Eis","Placeholder Ice"] },
+    { id:"s_bolt",emoji:"⚡", rarity:"epic",      cost:800,  de:["Platzhalter Blitz","Placeholder Bolt"] },
+    { id:"s_moon",emoji:"🌙", rarity:"epic",      cost:800,  de:["Platzhalter Mond","Placeholder Moon"] },
+    { id:"s_gold",emoji:"👑", rarity:"legendary", cost:1500, de:["Platzhalter Gold","Placeholder Gold"] },
+    { id:"s_skull",emoji:"💀",rarity:"legendary", cost:1500, de:["Platzhalter Tod","Placeholder Death"] }
   ];
 
   var shopTab = "upgrades";
@@ -630,30 +684,18 @@
     var k = upgradeKosten(u, lvl); if (m.seelen < k) return;
     m.seelen -= k; m.upgrades[id] = lvl+1; speichereMeta(m); renderShop();
   }
-  function shopKaufeWaffe(name) {
-    var m = ladeMeta(); var w = null; for (var i=0;i<SHOP_WEAPONS.length;i++) if (SHOP_WEAPONS[i].name===name) w=SHOP_WEAPONS[i];
-    if (!w) return; if (m.unlockedWeapons.indexOf(name) >= 0) return; if (m.seelen < w.cost) return;
-    m.seelen -= w.cost; m.unlockedWeapons.push(name); speichereMeta(m); renderShop();
-  }
-  function shopWaehleWaffe(name) {
-    var m = ladeMeta(); if (m.unlockedWeapons.indexOf(name) < 0) return;
-    if (m.startWeapon && m.startWeapon.name === name) { m.startWeapon = null; }
-    else { var w=null; for (var i=0;i<SHOP_WEAPONS.length;i++) if (SHOP_WEAPONS[i].name===name) w=SHOP_WEAPONS[i];
-      m.startWeapon = { name:w.name, basisDmg:w.basisDmg, rarity:w.rarity, schadensarten:w.schadensarten.slice() }; }
-    speichereMeta(m); renderShop();
-  }
   function shopSkinKlick(id) {
     var m = ladeMeta(); var sk = null; for (var i=0;i<SHOP_SKINS.length;i++) if (SHOP_SKINS[i].id===id) sk=SHOP_SKINS[i];
     if (!sk) return;
     var besitzt = id === "none" || m.unlockedSkins.indexOf(id) >= 0;
     if (!besitzt) { if (m.seelen < sk.cost) return; m.seelen -= sk.cost; m.unlockedSkins.push(id); }
-    m.activeSkinId = id; m.activeSkinFilter = sk.filter; speichereMeta(m); renderShop();
+    m.activeSkinId = id; m.activeSkinFilter = ""; speichereMeta(m); renderShop();
   }
-  window.shopKaufeUpgrade = shopKaufeUpgrade; window.shopKaufeWaffe = shopKaufeWaffe; window.shopWaehleWaffe = shopWaehleWaffe; window.shopSkinKlick = shopSkinKlick;
+  window.shopKaufeUpgrade = shopKaufeUpgrade; window.shopSkinKlick = shopSkinKlick;
 
   function updateShopButtonSouls() {
     var b = document.getElementById("btn-shop-souls"); if (b) b.innerText = " ✨" + ladeMeta().seelen;
-    var t = document.getElementById("btn-shop-text"); if (t) t.innerText = shopL("Seelenschmiede","Soul Forge");
+    var t = document.getElementById("btn-shop-text"); if (t) t.innerText = "Roundtable";
   }
   window.updateShopButtonSouls = updateShopButtonSouls;
 
@@ -663,16 +705,30 @@
   }
   function zeile(inner, opts) {
     opts = opts || {};
-    return '<div style="display:flex;align-items:center;gap:12px;text-align:left;background:rgba(0,0,0,0.3);border:1px solid ' + (opts.border||'#333') + ';border-radius:6px;padding:10px 12px;margin-bottom:8px;' + (opts.click?'cursor:pointer;':'') + (opts.dim?'opacity:0.55;':'') + '" ' + (opts.click?('onclick="' + opts.click + '"'):'') + '>' + inner + '</div>';
+    return '<div style="display:flex;align-items:center;gap:12px;text-align:left;background:rgba(0,0,0,0.3);border:1px solid ' + (opts.border||'#333') + ';border-radius:6px;padding:10px 12px;margin-bottom:8px;' + (opts.click?'cursor:pointer;':'') + (opts.dim?'opacity:0.5;':'') + '" ' + (opts.click?('onclick="' + opts.click + '"'):'') + '>' + inner + '</div>';
+  }
+
+  function truheCard(typ, m) {
+    var pool = typ === "waffe" ? lockedWeapons(m) : lockedArmor(m);
+    var gesamt = typ === "waffe" ? ALL_WEAPONS.length : ALL_ARMOR.length;
+    var frei = gesamt - pool.length;
+    var titel = typ === "waffe" ? shopL("Waffentruhe","Weapon Chest") : shopL("Rüstungstruhe","Armor Chest");
+    var leer = pool.length === 0; var ok = m.seelen >= CHEST_COST && !leer;
+    var rechts = leer ? '<span style="color:#54d98c;font-weight:bold;font-size:0.8rem;">' + shopL("KOMPLETT","COMPLETE") + '</span>'
+      : '<span style="color:' + (ok?'#cda34f':'#777') + ';font-weight:bold;white-space:nowrap;">✨ ' + CHEST_COST + '</span>';
+    var inner = '<span style="font-size:2rem;">📦</span>'
+      + '<div style="flex:1;"><strong style="color:#ede6d4;">' + titel + '</strong><br>'
+      + '<span style="color:#9aa0a6;font-size:0.78rem;">' + (leer ? shopL("Alles freigeschaltet","Everything unlocked") : shopL("Zufällige neue " + (typ==="waffe"?"Waffe":"Rüstung"), "Random new " + (typ==="waffe"?"weapon":"armor"))) + ' · ' + frei + '/' + gesamt + '</span></div>' + rechts;
+    return zeile(inner, { click: ok?("oeffneTruhe('"+typ+"')"):null, dim: !ok&&!leer, border: leer?'#4a6':'#333' });
   }
 
   function renderShop() {
     var m = ladeMeta();
     updateShopButtonSouls();
     var bar = document.getElementById("shop-souls-bar");
-    if (bar) bar.innerHTML = '✨ <b style="color:#cda34f;">' + m.seelen + '</b> ' + shopL("Seelen","Souls") + ' <span style="color:#777;font-size:0.8rem;">· ' + shopL("verdient in jedem Run","earned every run") + '</span>';
+    if (bar) bar.innerHTML = '✨ <b style="color:#cda34f;">' + m.seelen + '</b> ' + shopL("Seelen","Souls") + ' <span style="color:#777;font-size:0.8rem;">· ' + shopL("in jedem Run verdient","earned every run") + '</span>';
     var tabs = document.getElementById("shop-tabs");
-    if (tabs) tabs.innerHTML = shopTabBtn("upgrades","⚒️ "+shopL("Upgrades","Upgrades")) + shopTabBtn("waffen","🗡️ "+shopL("Waffen","Weapons")) + shopTabBtn("skins","🎨 "+shopL("Skins","Skins"));
+    if (tabs) tabs.innerHTML = shopTabBtn("upgrades","⚒️ "+shopL("Upgrades","Upgrades")) + shopTabBtn("truhen","📦 "+shopL("Truhen","Chests")) + shopTabBtn("skins","🎭 "+shopL("Skins","Skins"));
     var body = document.getElementById("shop-body"); if (!body) return;
     var html = "";
 
@@ -687,33 +743,26 @@
           + '<div style="flex:1;"><strong style="color:#ede6d4;">' + nm + ' <span style="color:#888;font-weight:normal;">Lv ' + lvl + '/' + u.max + '</span></strong><br><span style="color:#9aa0a6;font-size:0.78rem;">' + beschr + '</span></div>' + rechts;
         html += zeile(inner, { click: ok?("shopKaufeUpgrade('"+u.id+"')"):null, dim: !ok&&!max, border: max?'#4a6':'#333' });
       }
-    } else if (shopTab === "waffen") {
-      html += '<p style="color:#aaa;font-size:0.84rem;font-family:sans-serif;margin-top:0;">' + shopL("Schalte stärkere Start-Waffen frei und wähle eine aus, mit der du jeden Run beginnst.","Unlock stronger starting weapons and pick one to begin every run with.") + '</p>';
-      for (var j=0;j<SHOP_WEAPONS.length;j++) {
-        var w = SHOP_WEAPONS[j]; var col = RARITY_COL[w.rarity]||"#9aa0a6";
-        var hat = m.unlockedWeapons.indexOf(w.name) >= 0;
-        var aktiv = m.startWeapon && m.startWeapon.name === w.name;
-        var inner2 = '<span style="font-size:1.4rem;">' + (aktiv?'⭐':'🗡️') + '</span>'
-          + '<div style="flex:1;"><strong style="color:' + col + ';">' + w.name + '</strong><br><span style="color:#9aa0a6;font-size:0.76rem;">⚔️ ' + w.basisDmg + ' · ' + w.schadensarten.join("/") + '</span></div>';
-        var rechts2;
-        if (!hat) { var ok2 = m.seelen>=w.cost; rechts2 = '<span style="color:' + (ok2?'#cda34f':'#777') + ';font-weight:bold;white-space:nowrap;">✨ ' + w.cost + '</span>';
-          html += zeile(inner2 + rechts2, { click: ok2?("shopKaufeWaffe('"+w.name.replace(/'/g,"\\'")+"')"):null, dim: !ok2, border: col }); }
-        else { rechts2 = '<span style="color:' + (aktiv?'#54d98c':'#888') + ';font-weight:bold;font-size:0.8rem;white-space:nowrap;">' + (aktiv?shopL("AKTIV","ACTIVE"):shopL("wählen","select")) + '</span>';
-          html += zeile(inner2 + rechts2, { click: "shopWaehleWaffe('"+w.name.replace(/'/g,"\\'")+"')", border: aktiv?'var(--gold)':col }); }
-      }
+    } else if (shopTab === "truhen") {
+      html += '<p style="color:#aaa;font-size:0.82rem;font-family:sans-serif;margin-top:0;">' + shopL("Kaufe eine Truhe und schalte eine zufällige neue Waffe bzw. Rüstung frei – sie taucht danach als Beute in deinen Runs auf. Dein Standard-Set ist immer dabei.","Buy a chest to unlock a random new weapon or armor – it then appears as loot in your runs. Your standard set is always included.") + '</p>';
+      html += truheCard("waffe", m);
+      html += truheCard("ruestung", m);
     } else {
-      html += '<p style="color:#aaa;font-size:0.84rem;font-family:sans-serif;margin-top:0;">' + shopL("Kosmetische Skins färben deinen Kämpfer. Einmal gekauft jederzeit umschaltbar.","Cosmetic skins recolor your warrior. Once bought, switch anytime.") + '</p>';
+      html += '<p style="color:#aaa;font-size:0.82rem;font-family:sans-serif;margin-top:0;">' + shopL("Skins sind vorerst Platzhalter (Emojis). Bald: neue Starterklassen & Skins aus anderen FromSoft-Spielen.","Skins are placeholders for now (emojis). Coming soon: new starter classes & skins from other FromSoft games.") + '</p>';
       for (var s=0;s<SHOP_SKINS.length;s++) {
-        var sk = SHOP_SKINS[s]; var col3 = RARITY_COL[sk.rarity]||"#9aa0a6";
+        var sk = SHOP_SKINS[s]; var col3 = RARITY_COL[sk.rarity];
         var hat3 = sk.id==="none" || m.unlockedSkins.indexOf(sk.id) >= 0;
         var aktiv3 = m.activeSkinId === sk.id || (sk.id==="none" && !m.activeSkinId);
-        var swatch = '<span style="width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 35% 30%, #cdb38a, #6b4f2a);display:inline-block;filter:' + (sk.filter||"none") + ';border:2px solid ' + (aktiv3?'var(--gold)':col3) + ';flex-shrink:0;"></span>';
-        var inner3 = swatch + '<div style="flex:1;"><strong style="color:' + col3 + ';">' + shopL(sk.de[0],sk.de[1]) + '</strong><br><span style="color:#9aa0a6;font-size:0.74rem;">' + sk.rarity + '</span></div>';
-        var rechts3;
-        if (!hat3) { var ok3 = m.seelen>=sk.cost; rechts3 = '<span style="color:' + (ok3?'#cda34f':'#777') + ';font-weight:bold;white-space:nowrap;">✨ ' + sk.cost + '</span>';
-          html += zeile(inner3 + rechts3, { click: ok3?("shopSkinKlick('"+sk.id+"')"):null, dim: !ok3, border: col3 }); }
-        else { rechts3 = '<span style="color:' + (aktiv3?'#54d98c':'#888') + ';font-weight:bold;font-size:0.8rem;white-space:nowrap;">' + (aktiv3?shopL("AKTIV","ACTIVE"):shopL("anlegen","equip")) + '</span>';
-          html += zeile(inner3 + rechts3, { click: "shopSkinKlick('"+sk.id+"')", border: aktiv3?'var(--gold)':col3 }); }
+        var links3 = '<span style="font-size:1.7rem;width:34px;text-align:center;flex-shrink:0;">' + sk.emoji + '</span>'
+          + '<div style="flex:1;"><strong style="color:' + col3 + ';">' + shopL(sk.de[0],sk.de[1]) + '</strong><br><span style="color:#9aa0a6;font-size:0.74rem;">' + shopL(RARITY_NAME[sk.rarity][0],RARITY_NAME[sk.rarity][1]) + '</span></div>';
+        if (!hat3) {
+          var ok3 = m.seelen>=sk.cost;
+          html += zeile(links3 + '<span style="color:' + (ok3?'#cda34f':'#777') + ';font-weight:bold;white-space:nowrap;">✨ ' + sk.cost + '</span>',
+            { click: ok3?("shopSkinKlick('"+sk.id+"')"):null, dim:!ok3, border: col3 });
+        } else {
+          html += zeile(links3 + '<span style="color:' + (aktiv3?'#54d98c':'#888') + ';font-weight:bold;font-size:0.8rem;white-space:nowrap;">' + (aktiv3?shopL("AKTIV","ACTIVE"):shopL("anlegen","equip")) + '</span>',
+            { click:"shopSkinKlick('"+sk.id+"')", border: aktiv3?'var(--gold)':col3 });
+        }
       }
     }
     body.innerHTML = html;
