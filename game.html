@@ -622,11 +622,15 @@ window.hatGespeichertenRun = hatGespeichertenRun;
    Persistiert getrennt vom Run-Save (eigener localStorage-Key), überlebt den Tod.
    ============================================================ */
 const META_KEY = "eldenRogueMeta";
+const META_RESET_VERSION = 2;   // hochzählen = einmaliger Reset der Freischaltungen für alle Nutzer
 const DEFAULT_WEAPONS = ["Dolch","Kurzschwert","Breitschwert","Rapier","Claymore","Bluthundreißzahn","Maltöter Großbeil","Großsterne","Rostiger Anker","Blasphemous Blade"];
 const DEFAULT_ARMOR = ["Albinauric Set","Cleanrot Set","Briar Set","Haligtree Knight Set"];
-function metaDefault() { return { seelen:0, upgrades:{vitalitaet:0,schaerfe:0,wendigkeit:0,seelenfaenger:0,flakon:0}, unlockedWeapons: DEFAULT_WEAPONS.slice(), unlockedArmor: DEFAULT_ARMOR.slice(), unlockedSkins:[], activeSkinId:null, activeSkinFilter:"" }; }
+function metaDefault() { return { seelen:0, upgrades:{vitalitaet:0,schaerfe:0,wendigkeit:0,seelenfaenger:0,flakon:0}, unlockedWeapons: DEFAULT_WEAPONS.slice(), unlockedArmor: DEFAULT_ARMOR.slice(), unlockedSkins:[], activeSkinId:null, activeSkinFilter:"", resetVersion: META_RESET_VERSION }; }
 function ladeMeta() {
-  try { let m = JSON.parse(localStorage.getItem(META_KEY)); if (m && typeof m === "object") { let d = metaDefault(); let r = Object.assign(d, m, { upgrades: Object.assign(d.upgrades, m.upgrades||{}) }); r.unlockedWeapons = Array.from(new Set(DEFAULT_WEAPONS.concat(Array.isArray(r.unlockedWeapons)?r.unlockedWeapons:[]))); r.unlockedArmor = Array.from(new Set(DEFAULT_ARMOR.concat(Array.isArray(r.unlockedArmor)?r.unlockedArmor:[]))); return r; } } catch(e) {}
+  try { let m = JSON.parse(localStorage.getItem(META_KEY)); if (m && typeof m === "object") { let d = metaDefault(); let r = Object.assign(d, m, { upgrades: Object.assign(d.upgrades, m.upgrades||{}) });
+      if (m.resetVersion !== META_RESET_VERSION) { r.unlockedWeapons = DEFAULT_WEAPONS.slice(); r.unlockedArmor = DEFAULT_ARMOR.slice(); r.unlockedSkins = []; r.resetVersion = META_RESET_VERSION; speichereMeta(r); }
+      else { r.unlockedWeapons = Array.from(new Set(DEFAULT_WEAPONS.concat(Array.isArray(r.unlockedWeapons)?r.unlockedWeapons:[]))); r.unlockedArmor = Array.from(new Set(DEFAULT_ARMOR.concat(Array.isArray(r.unlockedArmor)?r.unlockedArmor:[]))); }
+      return r; } } catch(e) {}
   return metaDefault();
 }
 function speichereMeta(m) { try { localStorage.setItem(META_KEY, JSON.stringify(m)); } catch(e) {} }
