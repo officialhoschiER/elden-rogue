@@ -546,16 +546,19 @@
       return;
     }
     if (!dex || !dex.cats) { if (grid) grid.innerHTML = ""; return; }
+    var meta = ladeMeta();
     // Tabs
     var tabs = document.getElementById("dex-tabs");
     tabs.innerHTML = "";
     DEX_CATS.forEach(function(c){
-      var cat = dex.cats[c.key] || { found:0, total:0 };
+      var cat = dex.cats[c.key] || { found:0, total:0, items:[] };
+      var dFound = cat.found, dTotal = cat.total;
+      if (c.key === "weapons" && cat.items) { dTotal = cat.items.length; dFound = cat.items.filter(function(it){ return meta.unlockedWeapons.indexOf(it.name) >= 0; }).length; }
       var active = c.key === dexCurrentCat;
       var btn = document.createElement("button");
       btn.className = "btn-mini";
       btn.style.cssText = "border-color:" + (active?"var(--gold)":"var(--gold-dark)") + ";color:" + (active?"var(--gold)":"#b8a96f") + ";";
-      btn.innerText = c.label[lang] + " (" + cat.found + "/" + cat.total + ")";
+      btn.innerText = c.label[lang] + " (" + dFound + "/" + dTotal + ")";
       btn.onclick = function(){ dexCurrentCat = c.key; ladeEldendex(); };
       tabs.appendChild(btn);
     });
@@ -568,14 +571,17 @@
     var cat = dex.cats[dexCurrentCat];
     if (!cat) return;
     cat.items.forEach(function(it){
+      // Waffen werden im Eldendex nur gezeigt, wenn sie freigeschaltet sind (sonst schwarze Silhouette)
+      var seen = it.seen;
+      if (dexCurrentCat === "weapons") seen = meta.unlockedWeapons.indexOf(it.name) >= 0;
       var cell = document.createElement("div");
-      cell.style.cssText = "background:#0f0f0f;border:1px solid " + (it.seen?"var(--gold-dark)":"#222") + ";border-radius:6px;padding:8px 6px;text-align:center;";
-      var img = it.seen
+      cell.style.cssText = "background:#0f0f0f;border:1px solid " + (seen?"var(--gold-dark)":"#222") + ";border-radius:6px;padding:8px 6px;text-align:center;";
+      var img = seen
         ? '<img src="'+it.img+'" style="width:100%;height:70px;object-fit:contain;" onerror="this.style.opacity=0.2">'
         : '<img src="'+it.img+'" style="width:100%;height:70px;object-fit:contain;filter:grayscale(1) brightness(0);opacity:0.5;">';
-      var nm = '<div style="font-size:0.7rem;color:'+(it.seen?"#d4c89a":"#555")+';margin-top:6px;font-family:sans-serif;line-height:1.2;min-height:26px;">'+(it.seen?it.name:"???")+'</div>';
+      var nm = '<div style="font-size:0.7rem;color:'+(seen?"#d4c89a":"#555")+';margin-top:6px;font-family:sans-serif;line-height:1.2;min-height:26px;">'+(seen?it.name:"???")+'</div>';
       var st = "";
-      if (it.seen && it.cat === "weapons" && it.dmg) {
+      if (seen && it.cat === "weapons" && it.dmg) {
         st = '<div style="font-size:0.66rem;color:#9aa0a6;font-family:sans-serif;">⚔️ '+it.dmg+(it.types?' · '+it.types.join("/"):'')+'</div>';
       }
       cell.innerHTML = img + nm + st;
@@ -584,14 +590,21 @@
   }
   /* ===== ⚜️ ROUNDTABLE (Meta-Shop im Hauptmenü) ===== */
   var META_KEY = "eldenRogueMeta";
+  var META_RESET_VERSION = 2;   // hochzählen = einmaliger Reset der Freischaltungen für alle Nutzer
   var DEFAULT_WEAPONS = ["Dolch","Kurzschwert","Breitschwert","Rapier","Claymore","Bluthundreißzahn","Maltöter Großbeil","Großsterne","Rostiger Anker","Blasphemous Blade"];
   var DEFAULT_ARMOR = ["Albinauric Set","Cleanrot Set","Briar Set","Haligtree Knight Set"];
-  function metaDefault() { return { seelen:0, upgrades:{vitalitaet:0,schaerfe:0,wendigkeit:0,seelenfaenger:0,flakon:0}, unlockedWeapons: DEFAULT_WEAPONS.slice(), unlockedArmor: DEFAULT_ARMOR.slice(), unlockedSkins:[], activeSkinId:null, activeSkinFilter:"" }; }
+  function metaDefault() { return { seelen:0, upgrades:{vitalitaet:0,schaerfe:0,wendigkeit:0,seelenfaenger:0,flakon:0}, unlockedWeapons: DEFAULT_WEAPONS.slice(), unlockedArmor: DEFAULT_ARMOR.slice(), unlockedSkins:[], activeSkinId:null, activeSkinFilter:"", resetVersion: META_RESET_VERSION }; }
   function ladeMeta() {
     try { var m = JSON.parse(localStorage.getItem(META_KEY)); if (m && typeof m === "object") { var d = metaDefault(); var r = Object.assign(d, m); r.upgrades = Object.assign(metaDefault().upgrades, m.upgrades||{});
-      r.unlockedWeapons = Array.from(new Set(DEFAULT_WEAPONS.concat(Array.isArray(r.unlockedWeapons)?r.unlockedWeapons:[])));
-      r.unlockedArmor = Array.from(new Set(DEFAULT_ARMOR.concat(Array.isArray(r.unlockedArmor)?r.unlockedArmor:[])));
-      if (!Array.isArray(r.unlockedSkins)) r.unlockedSkins=[]; return r; } } catch(e) {}
+      if (m.resetVersion !== META_RESET_VERSION) {
+        r.unlockedWeapons = DEFAULT_WEAPONS.slice(); r.unlockedArmor = DEFAULT_ARMOR.slice(); r.unlockedSkins = [];
+        r.resetVersion = META_RESET_VERSION; speichereMeta(r);
+      } else {
+        r.unlockedWeapons = Array.from(new Set(DEFAULT_WEAPONS.concat(Array.isArray(r.unlockedWeapons)?r.unlockedWeapons:[])));
+        r.unlockedArmor = Array.from(new Set(DEFAULT_ARMOR.concat(Array.isArray(r.unlockedArmor)?r.unlockedArmor:[])));
+        if (!Array.isArray(r.unlockedSkins)) r.unlockedSkins=[];
+      }
+      return r; } } catch(e) {}
     return metaDefault();
   }
   function speichereMeta(m) { try { localStorage.setItem(META_KEY, JSON.stringify(m)); } catch(e) {} }
@@ -628,7 +641,7 @@
     {name:"Briar Set",rarity:"epic"},{name:"Black Knife Set",rarity:"epic"},
     {name:"Haligtree Knight Set",rarity:"legendary"},{name:"General Radahn Set",rarity:"legendary"},{name:"Crucible Axe Set",rarity:"legendary"}
   ];
-  var CHEST_COST = 300;
+  var CHEST_COST = 0;   // TODO: zum Testen auf 0 – später zurück auf ~300
   function lockedWeapons(m){ return ALL_WEAPONS.filter(function(w){ return m.unlockedWeapons.indexOf(w.name) < 0; }); }
   function lockedArmor(m){ return ALL_ARMOR.filter(function(a){ return (m.unlockedArmor||[]).indexOf(a.name) < 0; }); }
 
