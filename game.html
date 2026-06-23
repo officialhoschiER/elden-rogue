@@ -622,9 +622,11 @@ window.hatGespeichertenRun = hatGespeichertenRun;
    Persistiert getrennt vom Run-Save (eigener localStorage-Key), überlebt den Tod.
    ============================================================ */
 const META_KEY = "eldenRogueMeta";
-function metaDefault() { return { seelen:0, upgrades:{vitalitaet:0,schaerfe:0,flakon:0,wendigkeit:0,seelenfaenger:0}, unlockedWeapons:[], startWeapon:null, unlockedSkins:[], activeSkinId:null, activeSkinFilter:"" }; }
+const DEFAULT_WEAPONS = ["Dolch","Kurzschwert","Breitschwert","Rapier","Claymore","Bluthundreißzahn","Maltöter Großbeil","Großsterne","Rostiger Anker","Blasphemous Blade"];
+const DEFAULT_ARMOR = ["Albinauric Set","Cleanrot Set","Briar Set","Haligtree Knight Set"];
+function metaDefault() { return { seelen:0, upgrades:{vitalitaet:0,schaerfe:0,wendigkeit:0,seelenfaenger:0,flakon:0}, unlockedWeapons: DEFAULT_WEAPONS.slice(), unlockedArmor: DEFAULT_ARMOR.slice(), unlockedSkins:[], activeSkinId:null, activeSkinFilter:"" }; }
 function ladeMeta() {
-  try { let m = JSON.parse(localStorage.getItem(META_KEY)); if (m && typeof m === "object") { let d = metaDefault(); return Object.assign(d, m, { upgrades: Object.assign(d.upgrades, m.upgrades||{}) }); } } catch(e) {}
+  try { let m = JSON.parse(localStorage.getItem(META_KEY)); if (m && typeof m === "object") { let d = metaDefault(); let r = Object.assign(d, m, { upgrades: Object.assign(d.upgrades, m.upgrades||{}) }); r.unlockedWeapons = Array.from(new Set(DEFAULT_WEAPONS.concat(Array.isArray(r.unlockedWeapons)?r.unlockedWeapons:[]))); r.unlockedArmor = Array.from(new Set(DEFAULT_ARMOR.concat(Array.isArray(r.unlockedArmor)?r.unlockedArmor:[]))); return r; } } catch(e) {}
   return metaDefault();
 }
 function speichereMeta(m) { try { localStorage.setItem(META_KEY, JSON.stringify(m)); } catch(e) {} }
@@ -775,6 +777,8 @@ function dmgTypIconHtml(art) {
   return `<span class="dmg-type-icon tip" data-tooltip="${t("combat_dmg_type")}: ${dmgArtLoc(art)}"><img src="${datei}" alt="${dmgArtLoc(art)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';"><span class="dmg-fallback" style="display:none; color:${farbe};">${dmgArtLoc(art).slice(0,2)}</span></span>`;
 }
 
+function poolUnlockedWaffe(rarity){ let m=ladeMeta(); let pool=waffenDatenbank[rarity]||[]; let frei=pool.filter(w=>m.unlockedWeapons.indexOf(w.name)>=0); return frei.length?frei:pool; }
+function poolUnlockedRuestung(rarity){ let m=ladeMeta(); let pool=ruestungDatenbank[rarity]||[]; let frei=pool.filter(a=>(m.unlockedArmor||[]).indexOf(a.name)>=0); return frei.length?frei:pool; }
 function rolleZufallsWaffe() {
   let shift = Math.min(besiegteWaechter * 0.05, 0.40);
   let pCommon = 0.50 - shift, pRare = 0.30 + shift * 0.60, pEpic = 0.15 + shift * 0.30;
@@ -782,7 +786,7 @@ function rolleZufallsWaffe() {
   if (r < pCommon) rarity = "common"; else if (r < pCommon + pRare) rarity = "rare";
   else if (r < pCommon + pRare + pEpic) rarity = "epic"; else rarity = "legendary";
 
-  let pool = waffenDatenbank[rarity]; let base = pool[Math.floor(Math.random() * pool.length)];
+  let pool = poolUnlockedWaffe(rarity); let base = pool[Math.floor(Math.random() * pool.length)];
   let waffe = { name: base.name, basisDmg: base.basisDmg, rarity: rarity };
   if (rarity === "legendary") waffe.schadensarten = [...base.schadensarten];
   else waffe.schadensarten = [ schadensArten[Math.floor(Math.random() * schadensArten.length)] ];
@@ -891,7 +895,7 @@ const startRuestungen = {
 function rolleZufallsRuestung(){
   let r = Math.random(); let rarity;
   if (r < 0.50) rarity="common"; else if (r < 0.80) rarity="rare"; else if (r < 0.95) rarity="epic"; else rarity="legendary";
-  let pool = ruestungDatenbank[rarity]; let base = pool[Math.floor(Math.random()*pool.length)];
+  let pool = poolUnlockedRuestung(rarity); let base = pool[Math.floor(Math.random()*pool.length)];
   return { name: base.name, bild: base.bild, rarity: rarity, reduktion: ruestungRaritaetReduktion[rarity] };
 }
 function setzeAusgeruesteteRuestung(r){ ruestungName=r.name; ruestungRaritaet=r.rarity; ruestungReduktion=r.reduktion; ruestungBild=r.bild; }
@@ -1191,13 +1195,12 @@ function waehleKlasseEngine(klasse) {
   if (klasse === 'schwertkaempfer') { spielerMaxHp = 150; maxKlassenFlasks = hardMode ? 2 : 3; spielerFlasks = maxKlassenFlasks; basisAusweichChance = 0.30; playerImageStr = "images/tarnished_ritter.webp"; }
   else if (klasse === 'samurai') { spielerMaxHp = 110; maxKlassenFlasks = hardMode ? 1 : 2; spielerFlasks = maxKlassenFlasks; basisAusweichChance = 0.40; playerImageStr = "images/tarnished_samurai.webp"; }
   else if (klasse === 'nackt') { spielerMaxHp = 90; maxKlassenFlasks = hardMode ? 0 : 1; spielerFlasks = maxKlassenFlasks; basisAusweichChance = 0.50; playerImageStr = "images/tarnished_nackt.webp"; }
-  // ⚜️ Meta-Upgrades (Seelenschmiede) anwenden + Start-Talisman ausrüsten
+  // ⚜️ Meta-Upgrades (Roundtable) anwenden
   let __meta = ladeMeta(); let __up = __meta.upgrades || {};
   spielerMaxHp += (__up.vitalitaet||0) * 15;
   maxKlassenFlasks += (__up.flakon||0); spielerFlasks = maxKlassenFlasks;
   waffenUpgrade += (__up.schaerfe||0);
-  basisAusweichChance = Math.min(0.75, basisAusweichChance + (__up.wendigkeit||0) * 0.02);
-  if (__meta.startWeapon && __meta.startWeapon.name) setzeAusgeruesteteWaffe(__meta.startWeapon);
+  basisAusweichChance = Math.min(0.75, basisAusweichChance + (__up.wendigkeit||0) * 0.025);
   seelenVergeben = false;
   spielerHp = spielerMaxHp; document.getElementById("popup-content").classList.remove("klassen-modal"); document.getElementById("popup-overlay").style.display = "none";
   if (window.ER) ER.startRun(hardMode ? "hard" : "normal");
