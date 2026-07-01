@@ -781,16 +781,31 @@ function raritaetLabel_t(r) { return t('rarity_'+r); }
 const raritaetLabel  = new Proxy({ common: "Gewöhnlich", rare: "Selten", epic: "Episch", legendary: "Legendär" }, { get(o,k) { let v = window.i18n ? window.i18n.t('rarity_'+k) : null; return (v && v !== 'rarity_'+k) ? v : o[k] || k; } });
 
 const waffenDatenbank = {
-  common: [ { name: "Dolch", basisDmg: 9 }, { name: "Kurzschwert", basisDmg: 11 }, { name: "Breitschwert", basisDmg: 13 }, { name: "Rapier", basisDmg: 11 } ],
-  rare: [ { name: "Claymore", basisDmg: 23 }, { name: "Bluthundreißzahn", basisDmg: 25 }, { name: "Maltöter Großbeil", basisDmg: 27 } ],
-  epic: [ { name: "Großsterne", basisDmg: 35 }, { name: "Rostiger Anker", basisDmg: 39 } ],
+  common: [
+    { name: "Dolch", basisDmg: 9 }, { name: "Kurzschwert", basisDmg: 11 }, { name: "Breitschwert", basisDmg: 13 }, { name: "Rapier", basisDmg: 11 },
+    { name: "Banditenkrummschwert", basisDmg: 12 }, { name: "Estoc", basisDmg: 13 }, { name: "Kettenglied-Flegel", basisDmg: 14 },
+    { name: "Roter Zopf des Riesen", basisDmg: 14 }, { name: "Peitsche", basisDmg: 12 }, { name: "Geisterflammenfackel", basisDmg: 13 }, { name: "Glaive", basisDmg: 15 },
+    { name: "Keule", basisDmg: 11 }, { name: "Großaxt", basisDmg: 15 }, { name: "Uchigatana", basisDmg: 14 }
+  ],
+  rare: [
+    { name: "Claymore", basisDmg: 23 }, { name: "Bluthundreißzahn", basisDmg: 25 }, { name: "Maltöter Großbeil", basisDmg: 27 },
+    { name: "Flamberge", basisDmg: 24 }, { name: "Hellebarde des Verbannten Ritters", basisDmg: 24 }, { name: "Drachenhellebarde", basisDmg: 26 },
+    { name: "Magmaklinge", basisDmg: 26 }, { name: "Bluthundklauen", basisDmg: 26 }, { name: "Golem-Hellebarde", basisDmg: 28 },
+    { name: "Spitzhacke", basisDmg: 28 }, { name: "Wachhund-Großschwert", basisDmg: 30 }
+  ],
+  epic: [
+    { name: "Großsterne", basisDmg: 35 }, { name: "Rostiger Anker", basisDmg: 39 },
+    { name: "Drachenschuppenklinge", basisDmg: 36 }, { name: "Eisrand-Beil", basisDmg: 36 }, { name: "Meteoritenerz-Klinge", basisDmg: 36 },
+    { name: "Geflügelte Sense", basisDmg: 38 }, { name: "Vykes Kriegsspeer", basisDmg: 40 }, { name: "Ghizas Rad", basisDmg: 40 }, { name: "Schlangenjäger", basisDmg: 42 }
+  ],
   legendary: [
     { name: "Blasphemous Blade", basisDmg: 50, schadensarten: ["Magie", "Feuer"] },
     { name: "Malenias Blade", basisDmg: 68, schadensarten: ["Normal"] },
     { name: "Goldene Hellebarde", basisDmg: 50, schadensarten: ["Heilig", "Normal"] },
     { name: "Marikas Hammer", basisDmg: 50, schadensarten: ["Heilig", "Magie"] },
     { name: "Mohgwyns heiliger Speer", basisDmg: 50, schadensarten: ["Feuer", "Normal"] },
-    { name: "Halo Scythe", basisDmg: 52, schadensarten: ["Heilig"] }
+    { name: "Halo Scythe", basisDmg: 52, schadensarten: ["Heilig"] },
+    { name: "Dunkelmondgroßschwert", basisDmg: 55, schadensarten: ["Magie", "Normal"] }
   ]
 };
 
@@ -808,7 +823,16 @@ const waffenBilder = {
   "Maltöter Großbeil": "images/weapons/maltoeter_grossbeil.png", "Großsterne": "images/weapons/grosssterne.png", "Rostiger Anker": "images/weapons/rostiger_anker.png",
   "Blasphemous Blade": "images/weapons/blasphemous_blade.png", "Malenias Blade": "images/weapons/malenias_blade.png",
   "Goldene Hellebarde": "images/weapons/goldene_hellebarde.png", "Marikas Hammer": "images/weapons/marikas_hammer.png",
-  "Mohgwyns heiliger Speer": "images/weapons/mohgwyns_speer.png", "Dunkelmondgroßschwert": "images/weapons/dunkelmondgrossschwert.png"
+  "Mohgwyns heiliger Speer": "images/weapons/mohgwyns_speer.png", "Halo Scythe": "images/weapons/halo_scythe.png",
+  "Dunkelmondgroßschwert": "images/weapons/dunkelmondgrossschwert.png",
+  "Banditenkrummschwert": "images/weapons/bandits_curved.png", "Estoc": "images/weapons/estoc_thrusting.png", "Kettenglied-Flegel": "images/weapons/chainlink_flail.png",
+  "Roter Zopf des Riesen": "images/weapons/giant's_red.png", "Peitsche": "images/weapons/whip_weapon.png", "Geisterflammenfackel": "images/weapons/ghostflame_torch.png",
+  "Glaive": "images/weapons/glaive_halberds.png", "Flamberge": "images/weapons/flamberge_weapon.png", "Hellebarde des Verbannten Ritters": "images/weapons/banished_knights_halberd.png",
+  "Drachenhellebarde": "images/weapons/dragon_halberd.png", "Magmaklinge": "images/weapons/magma_blade.png", "Bluthundklauen": "images/weapons/bloodhound_claws.png",
+  "Golem-Hellebarde": "images/weapons/golems_halberd.png", "Spitzhacke": "images/weapons/pickaxe_warhammer.png", "Wachhund-Großschwert": "images/weapons/watchdogs_greatsword.png",
+  "Drachenschuppenklinge": "images/weapons/dragonscale_blade.png", "Eisrand-Beil": "images/weapons/icerind_hatchet.png", "Meteoritenerz-Klinge": "images/weapons/meteoric_ore_blade.png",
+  "Geflügelte Sense": "images/weapons/winged_scythe.png", "Vykes Kriegsspeer": "images/weapons/vykes_war_spear.png", "Ghizas Rad": "images/weapons/ghiza's_wheel.png",
+  "Schlangenjäger": "images/weapons/serpent-hunter_greatspear.png"
 };
 function gibWaffenBild(name) { return waffenBilder[name] || platzhalterWaffenBild; }
 function waffenNameLoc(name) { if (!window.i18n) return name; let k = "weapon_" + name.toLowerCase().replace(/[^a-zäöüß]/g,"_"); let v = window.i18n.t(k); return (v !== k) ? v : name; }
