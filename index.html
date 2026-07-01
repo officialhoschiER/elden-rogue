@@ -593,7 +593,7 @@
   var META_RESET_VERSION = 2;   // hochzählen = einmaliger Reset der Freischaltungen für alle Nutzer
   var DEFAULT_WEAPONS = ["Dolch","Kurzschwert","Breitschwert","Rapier","Claymore","Bluthundreißzahn","Maltöter Großbeil","Großsterne","Rostiger Anker","Blasphemous Blade"];
   var DEFAULT_ARMOR = ["Albinauric Set","Cleanrot Set","Briar Set","Haligtree Knight Set"];
-  function metaDefault() { return { seelen:0, upgrades:{vitalitaet:0,schaerfe:0,wendigkeit:0,seelenfaenger:0,flakon:0}, unlockedWeapons: DEFAULT_WEAPONS.slice(), unlockedArmor: DEFAULT_ARMOR.slice(), unlockedSkins:[], activeSkinId:null, activeSkinFilter:"", resetVersion: META_RESET_VERSION }; }
+  function metaDefault() { return { seelen:0, upgrades:{vitalitaet:0,schaerfe:0,wendigkeit:0,seelenfaenger:0,flakon:0}, unlockedWeapons: DEFAULT_WEAPONS.slice(), unlockedArmor: DEFAULT_ARMOR.slice(), unlockedSkins:[], activeSkinId:null, activeSkinFilter:"", chestPity:{waffe:0,ruestung:0}, resetVersion: META_RESET_VERSION }; }
   function ladeMeta() {
     try { var m = JSON.parse(localStorage.getItem(META_KEY)); if (m && typeof m === "object") { var d = metaDefault(); var r = Object.assign(d, m); r.upgrades = Object.assign(metaDefault().upgrades, m.upgrades||{});
       if (m.resetVersion !== META_RESET_VERSION) {
@@ -648,31 +648,49 @@
   var ARMOR_IMG = { "Albinauric Set":"images/armor/albinauric_set.png","Bloodhound Knight Set":"images/armor/bloodhound_set.png","Cleanrot Set":"images/armor/cleanrotf.png","Godrick Soldier Set":"images/armor/godrick_soldier_set.png","Briar Set":"images/armor/briar_set.png","Black Knife Set":"images/armor/black_knife_set.png","Haligtree Knight Set":"images/armor/haligtree_knight_set.png","General Radahn Set":"images/armor/radahn_set.png","Crucible Axe Set":"images/armor/crucible_knight_set.png" };
   window.imgFallback = function(el, emoji, size){ var sp=document.createElement("span"); sp.textContent=emoji; sp.style.fontSize=(size||48)+"px"; sp.style.lineHeight="1"; if(el.parentNode) el.parentNode.replaceChild(sp, el); };
   function itemImgHtml(typ, item, size){ var src = typ==="waffe" ? weaponImg(item.name) : (ARMOR_IMG[item.name]||""); var fb = typ==="waffe" ? "🗡️" : "🛡️"; if(!src) return '<span style="font-size:'+size+'px;line-height:1;">'+fb+'</span>'; return '<img src="'+src+'" alt="" style="width:'+size+'px;height:'+size+'px;object-fit:contain;" onerror="imgFallback(this,&#39;'+fb+'&#39;,'+size+')">'; }
-  var CHEST_COST = 0;   // TODO: zum Testen auf 0 – später zurück auf ~300
+  var CHEST_COST = 300;   // Preis pro Truhe (Duplikat erstattet die Hälfte)
+  var PITY_THRESHOLD = 4; // nach so vielen Duplikaten in Folge ist die nächste Truhe garantiert ein NEUES Item
+  function pityGet(m, typ){ if(!m.chestPity||typeof m.chestPity!=="object") m.chestPity={waffe:0,ruestung:0}; return m.chestPity[typ]||0; }
+  function pitySet(m, typ, v){ if(!m.chestPity||typeof m.chestPity!=="object") m.chestPity={waffe:0,ruestung:0}; m.chestPity[typ]=v; }
   function lockedWeapons(m){ return ALL_WEAPONS.filter(function(w){ return m.unlockedWeapons.indexOf(w.name) < 0; }); }
   function lockedArmor(m){ return ALL_ARMOR.filter(function(a){ return (m.unlockedArmor||[]).indexOf(a.name) < 0; }); }
+
+  function rollRaritaet(){ var r = Math.random(); return r < 0.50 ? "common" : r < 0.75 ? "rare" : r < 0.90 ? "epic" : "legendary"; }  // 50/25/15/10
 
   function oeffneTruhe(typ) {
     var m = ladeMeta();
     if (m.seelen < CHEST_COST) return;
     var all = typ === "waffe" ? ALL_WEAPONS : ALL_ARMOR;
-    var r = Math.random();
-    var rar = r < 0.50 ? "common" : r < 0.75 ? "rare" : r < 0.90 ? "epic" : "legendary";  // 50/25/15/10
-    var pool = all.filter(function(x){ return x.rarity === rar; });
-    if (!pool.length) pool = all;
-    var item = pool[Math.floor(Math.random() * pool.length)];
     var liste = typ === "waffe" ? m.unlockedWeapons : (m.unlockedArmor = m.unlockedArmor || []);
+    var locked = all.filter(function(x){ return liste.indexOf(x.name) < 0; });
+
+    // Pech-Schutz: nach PITY_THRESHOLD Duplikaten in Folge ist die nächste Truhe garantiert neu.
+    var pity = pityGet(m, typ);
+    var pityAktiv = pity >= PITY_THRESHOLD && locked.length > 0;
+
+    var item;
+    if (pityAktiv) {
+      // garantiert neu – bevorzugt in der ausgewürfelten Seltenheit, sonst irgendein gesperrtes Item
+      var lp = locked.filter(function(x){ return x.rarity === rollRaritaet(); });
+      if (!lp.length) lp = locked;
+      item = lp[Math.floor(Math.random() * lp.length)];
+    } else {
+      var pool = all.filter(function(x){ return x.rarity === rollRaritaet(); });
+      if (!pool.length) pool = all;
+      item = pool[Math.floor(Math.random() * pool.length)];
+    }
+
     var owned = liste.indexOf(item.name) >= 0;
     m.seelen -= CHEST_COST;
     var refund = 0;
-    if (owned) { refund = Math.floor(CHEST_COST / 2); m.seelen += refund; }
-    else { liste.push(item.name); }
+    if (owned) { refund = Math.floor(CHEST_COST / 2); m.seelen += refund; pitySet(m, typ, Math.min(PITY_THRESHOLD, pity + 1)); }
+    else { liste.push(item.name); pitySet(m, typ, 0); }
     speichereMeta(m);
-    chestReveal(typ, item, owned, refund);
+    chestReveal(typ, item, owned, refund, pityAktiv);
   }
   window.oeffneTruhe = oeffneTruhe;
 
-  function chestReveal(typ, item, dup, refund) {
+  function chestReveal(typ, item, dup, refund, pityWar) {
     var body = document.getElementById("shop-body"); if (!body) return;
     updateShopButtonSouls();
     body.innerHTML = '<div style="text-align:center;padding:24px 0;">'
@@ -685,7 +703,11 @@
       var titel = dup ? shopL("Schon im Besitz – Duplikat","Already owned – duplicate") : shopL("Neu freigeschaltet!","Newly unlocked!");
       var unten = dup ? (shopL("Hälfte erstattet: ","Half refunded: ") + '✨' + refund)
                       : shopL("Taucht ab jetzt als Beute in deinen Runs auf.","From now on it appears as loot in your runs.");
+      var pityBadge = pityWar
+        ? '<div style="display:inline-block;margin-bottom:8px;padding:3px 12px;border:1px solid #f1c40f;border-radius:20px;background:rgba(241,196,15,0.12);color:#f1c40f;font-family:sans-serif;font-size:0.72rem;font-weight:bold;letter-spacing:1px;box-shadow:0 0 14px rgba(241,196,15,0.35);">★ ' + shopL("PECH-SCHUTZ – GARANTIERT NEU","PITY – GUARANTEED NEW") + ' ★</div><br>'
+        : '';
       body.innerHTML = '<div style="text-align:center;padding:18px 0;">'
+        + pityBadge
         + '<div style="font-size:0.72rem;color:' + (dup?'#cda34f':col) + ';text-transform:uppercase;letter-spacing:2px;">' + titel + '</div>'
         + '<div style="margin:10px 0;display:inline-block;animation:itemPop 0.6s ease-out;filter:drop-shadow(0 0 16px ' + col + ');">' + itemImgHtml(typ, item, 92) + '</div>'
         + '<div style="color:' + col + ';font-size:1.3rem;font-family:Georgia,serif;">' + item.name + '</div>'
@@ -739,6 +761,26 @@
     return '<div style="display:flex;align-items:center;gap:12px;text-align:left;background:rgba(0,0,0,0.3);border:1px solid ' + (opts.border||'#333') + ';border-radius:6px;padding:10px 12px;margin-bottom:8px;' + (opts.click?'cursor:pointer;':'') + (opts.dim?'opacity:0.5;':'') + '" ' + (opts.click?('onclick="' + opts.click + '"'):'') + '>' + inner + '</div>';
   }
 
+  // Optisch ansprechende Pech-Schutz-Leiste unter jeder Truhe
+  function pityBarHtml(typ, m) {
+    var locked = typ === "waffe" ? lockedWeapons(m) : lockedArmor(m);
+    if (!locked.length) return "";   // Sammlung komplett -> kein Pech-Schutz nötig
+    var pity = pityGet(m, typ);
+    var voll = pity >= PITY_THRESHOLD;
+    var pct = Math.max(0, Math.min(100, Math.round(pity / PITY_THRESHOLD * 100)));
+    var uebrig = PITY_THRESHOLD - pity;
+    var label = voll
+      ? ('★ ' + shopL("Nächste Truhe garantiert NEU","Next chest guaranteed NEW") + ' ★')
+      : (shopL("Garantiert neu in","Guaranteed new in") + ' ' + uebrig + ' ' + (uebrig === 1 ? shopL("Truhe","chest") : shopL("Truhen","chests")));
+    var barCol = voll ? 'linear-gradient(90deg,#f1c40f,#ffe89a)' : 'linear-gradient(90deg,#8c6d2d,#cda34f)';
+    return '<div style="margin:-4px 0 12px;padding:0 3px;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;font-family:sans-serif;font-size:0.66rem;letter-spacing:0.4px;margin-bottom:3px;color:' + (voll ? '#f1c40f' : '#8c8577') + ';">'
+      +   '<span style="text-transform:uppercase;">🛡️ ' + shopL("Pech-Schutz","Pity") + '</span><span style="font-weight:bold;">' + label + '</span></div>'
+      + '<div style="height:7px;background:rgba(0,0,0,0.55);border:1px solid #2e2a22;border-radius:4px;overflow:hidden;">'
+      +   '<div style="height:100%;width:' + pct + '%;background:' + barCol + ';border-radius:3px;transition:width 0.35s ease;' + (voll ? 'box-shadow:0 0 9px #f1c40f;' : '') + '"></div>'
+      + '</div></div>';
+  }
+
   function truheCard(typ, m) {
     var pool = typ === "waffe" ? lockedWeapons(m) : lockedArmor(m);
     var gesamt = typ === "waffe" ? ALL_WEAPONS.length : ALL_ARMOR.length;
@@ -750,7 +792,7 @@
     var inner = '<img src="' + CHEST_IMG + '" alt="" style="width:58px;height:46px;object-fit:contain;flex-shrink:0;">'
       + '<div style="flex:1;"><strong style="color:#ede6d4;">' + titel + '</strong><br>'
       + '<span style="color:#9aa0a6;font-size:0.78rem;">' + (leer ? shopL("Alle gesammelt","All collected") : shopL("Zufälliges Item","Random item")) + ' · ' + frei + '/' + gesamt + '</span></div>' + rechts;
-    return zeile(inner, { click: ok?("oeffneTruhe('"+typ+"')"):null, dim: !ok&&!leer, border: leer?'#4a6':'#333' });
+    return zeile(inner, { click: ok?("oeffneTruhe('"+typ+"')"):null, dim: !ok&&!leer, border: leer?'#4a6':'#333' }) + pityBarHtml(typ, m);
   }
 
   function renderShop() {
