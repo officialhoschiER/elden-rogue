@@ -5,7 +5,7 @@
    Cloud-Speicher sind aktiv. Lokaler Fallback greift automatisch,
    falls Firebase nicht erreichbar ist.
 
-   v1.4 – synchron zu game.html / lang.js:
+   v1.5 – synchron zu game.html / lang.js:
      • 37 Achievements (vorher 22)
      • Schwierigkeit (normal/hard) wird durchgängig getrackt
      • getrennte Bestenlisten für Normal und Hard
@@ -120,6 +120,30 @@
     { id:"w:Marikas Hammer",          cat:"weapons", name:"Marikas Hammer",          img:"images/weapons/marikas_hammer.png",       dmg:50, types:["Heilig","Magie"] },
     { id:"w:Mohgwyns heiliger Speer", cat:"weapons", name:"Mohgwyns heiliger Speer", img:"images/weapons/mohgwyns_speer.png",       dmg:50, types:["Feuer","Normal"] },
     { id:"w:Halo Scythe",             cat:"weapons", name:"Halo Scythe",             img:"images/weapons/halo_scythe.png",          dmg:52, types:["Heilig"] },
+    // --- Neue Waffen (Icon-Sheet) ---
+    { id:"w:Banditenkrummschwert",              cat:"weapons", name:"Banditenkrummschwert",              img:"images/weapons/bandits_curved.png",            dmg:12, types:["Normal"] },
+    { id:"w:Estoc",                             cat:"weapons", name:"Estoc",                             img:"images/weapons/estoc_thrusting.png",           dmg:13, types:["Normal"] },
+    { id:"w:Kettenglied-Flegel",                cat:"weapons", name:"Kettenglied-Flegel",                img:"images/weapons/chainlink_flail.png",           dmg:14, types:["Normal"] },
+    { id:"w:Roter Zopf des Riesen",             cat:"weapons", name:"Roter Zopf des Riesen",             img:"images/weapons/giant's_red.png",               dmg:14, types:["Normal"] },
+    { id:"w:Peitsche",                          cat:"weapons", name:"Peitsche",                          img:"images/weapons/whip_weapon.png",               dmg:12, types:["Normal"] },
+    { id:"w:Geisterflammenfackel",              cat:"weapons", name:"Geisterflammenfackel",              img:"images/weapons/ghostflame_torch.png",          dmg:13, types:["Magie"] },
+    { id:"w:Glaive",                            cat:"weapons", name:"Glaive",                            img:"images/weapons/glaive_halberds.png",           dmg:15, types:["Normal"] },
+    { id:"w:Flamberge",                         cat:"weapons", name:"Flamberge",                         img:"images/weapons/flamberge_weapon.png",          dmg:24, types:["Normal"] },
+    { id:"w:Hellebarde des Verbannten Ritters", cat:"weapons", name:"Hellebarde des Verbannten Ritters", img:"images/weapons/banished_knights_halberd.png",  dmg:24, types:["Normal"] },
+    { id:"w:Drachenhellebarde",                 cat:"weapons", name:"Drachenhellebarde",                 img:"images/weapons/dragon_halberd.png",            dmg:26, types:["Feuer"] },
+    { id:"w:Magmaklinge",                       cat:"weapons", name:"Magmaklinge",                       img:"images/weapons/magma_blade.png",               dmg:26, types:["Feuer"] },
+    { id:"w:Bluthundklauen",                    cat:"weapons", name:"Bluthundklauen",                    img:"images/weapons/bloodhound_claws.png",          dmg:26, types:["Normal"] },
+    { id:"w:Golem-Hellebarde",                  cat:"weapons", name:"Golem-Hellebarde",                  img:"images/weapons/golems_halberd.png",            dmg:28, types:["Normal"] },
+    { id:"w:Spitzhacke",                        cat:"weapons", name:"Spitzhacke",                        img:"images/weapons/pickaxe_warhammer.png",         dmg:28, types:["Normal"] },
+    { id:"w:Wachhund-Großschwert",              cat:"weapons", name:"Wachhund-Großschwert",              img:"images/weapons/watchdogs_greatsword.png",      dmg:30, types:["Normal"] },
+    { id:"w:Drachenschuppenklinge",             cat:"weapons", name:"Drachenschuppenklinge",             img:"images/weapons/dragonscale_blade.png",         dmg:36, types:["Normal"] },
+    { id:"w:Eisrand-Beil",                      cat:"weapons", name:"Eisrand-Beil",                      img:"images/weapons/icerind_hatchet.png",           dmg:36, types:["Magie"] },
+    { id:"w:Meteoritenerz-Klinge",              cat:"weapons", name:"Meteoritenerz-Klinge",              img:"images/weapons/meteoric_ore_blade.png",        dmg:36, types:["Magie","Normal"] },
+    { id:"w:Geflügelte Sense",                  cat:"weapons", name:"Geflügelte Sense",                  img:"images/weapons/winged_scythe.png",             dmg:38, types:["Heilig"] },
+    { id:"w:Vykes Kriegsspeer",                 cat:"weapons", name:"Vykes Kriegsspeer",                 img:"images/weapons/vykes_war_spear.png",           dmg:40, types:["Feuer","Normal"] },
+    { id:"w:Ghizas Rad",                        cat:"weapons", name:"Ghizas Rad",                        img:"images/weapons/ghiza's_wheel.png",             dmg:40, types:["Normal"] },
+    { id:"w:Schlangenjäger",                    cat:"weapons", name:"Schlangenjäger",                    img:"images/weapons/serpent-hunter_greatspear.png", dmg:42, types:["Normal"] },
+    { id:"w:Dunkelmondgroßschwert",             cat:"weapons", name:"Dunkelmondgroßschwert",             img:"images/weapons/dunkelmondgrossschwert.png",    dmg:55, types:["Magie","Normal"] },
     // --- Rüstungen ---
     { id:"a:Albinauric Set",        cat:"armor", name:"Albinauric Set",        img:"images/armor/albinauric_set.png" },
     { id:"a:Bloodhound Knight Set", cat:"armor", name:"Bloodhound Knight Set", img:"images/armor/bloodhound_set.png" },
@@ -276,7 +300,7 @@
 
   function normDiff(d) { return d === "hard" ? "hard" : "normal"; }
   // Bestenlisten-Kategorien: Basis (normal/hard), Battle Tower und je Challenge eine eigene Liste.
-  const LB_KATEGORIEN = ["normal", "hard", "tower", "noarmor", "noblaidd", "autobattle", "haligtree"];
+  const LB_KATEGORIEN = ["normal", "hard", "tower", "noarmor", "noblaidd", "autobattle"];
   function normCat(c) { return LB_KATEGORIEN.indexOf(c) >= 0 ? c : "normal"; }
   function patchKey(p) { return String(p || PATCH).replace(/\./g, "_"); } // "1.5" -> "1_5"
   function leererPatchSlot() { var o = {}; LB_KATEGORIEN.forEach(function (c) { o[c] = { score: 0, stage: 0, bosses: 0 }; }); return o; }
