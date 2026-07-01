@@ -540,8 +540,38 @@ h1, h2, h3, .btn-menu, .btn-combat, .btn-social, .game-author-tag, #region-displ
 const urlParams = new URLSearchParams(window.location.search);
 const hardMode = urlParams.get("mode") === "hard";
 const resumeRun = urlParams.get("resume") === "true";
+
+// ============================================================
+//  ZENTRALE BALANCE-KONFIGURATION
+//  Alle wichtigen Stellschrauben an einem Ort. Werte hier ändern,
+//  ohne die Spiellogik anfassen zu müssen.
+// ============================================================
+const CONFIG = {
+  // --- Heilung & Ausweichen ---
+  estusHeilProzent: { normal: 0.35, hard: 0.25 },   // Anteil der Max-HP, den ein Flakon heilt
+  ausweichenCap:    { normal: 0.75, hard: 0.65 },   // maximale Ausweichchance
+  // --- Kampf ---
+  staggerTreffer:      { normal: 4, hard: 5 },       // Treffer, bis der Gegner taumelt
+  staggerBonusSchaden: 1.3,                          // Schadensmultiplikator für den Treffer nach dem Stagger
+  buffBonusProStack:   0.15,                         // Bonus je gestapeltem Rucksack-Buff (dmg / dodge / hp)
+  // --- Affinität-Burst (jeder 5. Treffer), je nach abgeschlossenen Dungeons ---
+  affinityBurst: { basis: 0.05, ab2Dungeons: 0.075, ab3Dungeons: 0.10 },
+  // --- Beute ---
+  waffenRarityShift: { proWaechter: 0.05, max: 0.40 }, // bessere Waffen-Chance je besiegtem Wächter
+  // --- Tower-Modus (endloser Aufstieg, Score = höchste Etage) ---
+  tower: {
+    hpBasis: 55,  hpProEtage: 0.16,  hpExpo: 1.025,   // Gegner-HP = hpBasis * (1 + hpProEtage*(etage-1)) * hpExpo^(etage-1)
+    dmgBasis: 9,  dmgProEtage: 0.12, dmgExpo: 1.02,   // Gegner-Schaden analog
+    hardFaktor: 1.35,                                  // zusätzlicher Multiplikator im Hard-Modus
+    minibossAlle: 5,                                   // jede 5. Etage ein Miniboss (mehr HP/Schaden)
+    minibossHpMult: 1.9, minibossDmgMult: 1.4,
+    heilProEtage: 0.30                                 // Anteil der Max-HP, der zwischen den Etagen geheilt wird
+  }
+};
+function diffVal(o){ return o[hardMode ? "hard" : "normal"]; }
+
 let activeChallenge = urlParams.get("challenge") || "";
-let spielerHp = 100; let spielerMaxHp = 100; let spielerFlasks = 3; let maxKlassenFlasks = 3; let estusHeilProzent = hardMode ? 0.25 : 0.35; let gewaehlteKlasse = ""; let basisAusweichChance = 0.0;
+let spielerHp = 100; let spielerMaxHp = 100; let spielerFlasks = 3; let maxKlassenFlasks = 3; let estusHeilProzent = diffVal(CONFIG.estusHeilProzent); let gewaehlteKlasse = ""; let basisAusweichChance = 0.0;
 let waffenName = ""; let waffenSchaden = 0; let waffenUpgrade = 0;
 let waffenRaritaet = "common"; let waffenSchadensarten = ["Normal"];
 let gelagerteWaffen = []; let maxWaffenSlots = hardMode ? 0 : 1;
@@ -585,7 +615,7 @@ function speichereRun() {
     questProgress, medallionHalves, fortressPlacedRegions, currentAffinity, affinityHits, completedDungeonsCount,
     backpackItems, activeBuffs,
     aktuelleRegion, aktuelleEbene, geloesieKnotenIds, aktuellerKnotenId,
-    netzKarte, inSubDungeon, mainMapState
+    netzKarte, inSubDungeon, mainMapState, towerEtage
   };
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch(e) {}
 }
@@ -608,6 +638,8 @@ function ladeGespeichertenRun() {
     aktuelleRegion=d.aktuelleRegion; aktuelleEbene=d.aktuelleEbene; geloesieKnotenIds=d.geloesieKnotenIds||[]; aktuellerKnotenId=d.aktuellerKnotenId;
     netzKarte=d.netzKarte||[]; inSubDungeon=d.inSubDungeon; mainMapState=d.mainMapState;
     activeChallenge=d.challenge||"";
+    towerEtage=d.towerEtage||0;
+    if (activeChallenge === "tower") { if (!towerEtage) towerEtage = 1; starteTowerKampf(); return true; }
     baueKarteHTML(); updateUI();
     return true;
   } catch(e) { return false; }
@@ -655,6 +687,13 @@ function belohneSeelen(gewonnen) {
  
 
 let aktionsSperre = false;
+let autoBattleRunning = false;   // verhindert mehrfach laufende Auto-Battle-Schleifen
+let bossPhaseWechsel = false;    // true, wenn der Gegner gerade in seine nächste Phase gewechselt ist (kein Sofort-Konter)
+let towerEtage = 0;              // aktuelle Etage im Tower-Modus (0 = nicht im Tower)
+
+// Kleiner Promise-Helfer, damit Kampfsequenzen linear mit await statt mit
+// verschachtelten setTimeout-Callbacks geschrieben werden koennen.
+function wait(ms) { return new Promise(res => setTimeout(res, ms)); }
 
 /* ===== i18n / STATIC TEXT RENDERING ===== */
 function t(key, placeholders) {
@@ -784,7 +823,7 @@ function dmgTypIconHtml(art) {
 function poolUnlockedWaffe(rarity){ let m=ladeMeta(); let pool=waffenDatenbank[rarity]||[]; let frei=pool.filter(w=>m.unlockedWeapons.indexOf(w.name)>=0); return frei.length?frei:pool; }
 function poolUnlockedRuestung(rarity){ let m=ladeMeta(); let pool=ruestungDatenbank[rarity]||[]; let frei=pool.filter(a=>(m.unlockedArmor||[]).indexOf(a.name)>=0); return frei.length?frei:pool; }
 function rolleZufallsWaffe() {
-  let shift = Math.min(besiegteWaechter * 0.05, 0.40);
+  let shift = Math.min(besiegteWaechter * CONFIG.waffenRarityShift.proWaechter, CONFIG.waffenRarityShift.max);
   let pCommon = 0.50 - shift, pRare = 0.30 + shift * 0.60, pEpic = 0.15 + shift * 0.30;
   let r = Math.random(); let rarity;
   if (r < pCommon) rarity = "common"; else if (r < pCommon + pRare) rarity = "rare";
@@ -1177,14 +1216,14 @@ window.onERAchievement = function (a) {
 function direktNeustarten() {
   loescheRunSave();
   let ds = document.getElementById("death-screen"); if (ds) ds.classList.remove("show");
-  spielerHp = 100; spielerMaxHp = 100; spielerFlasks = 3; maxKlassenFlasks = 3; estusHeilProzent = hardMode ? 0.25 : 0.35;
+  spielerHp = 100; spielerMaxHp = 100; spielerFlasks = 3; maxKlassenFlasks = 3; estusHeilProzent = diffVal(CONFIG.estusHeilProzent);
   waffenUpgrade = 0; gelagerteWaffen = []; maxWaffenSlots = hardMode ? 0 : 1; besiegteWaechter = 0; waffenRaritaet = "common"; waffenSchadensarten = ["Normal"];
   ruestungName = t("no_armor"); ruestungRaritaet = "common"; ruestungReduktion = 0; ruestungBild = "";
   ausgeruesteteTalismane = []; maxTalismanSlots = hardMode ? 2 : 3; hatGodrickRune = false; hatRadahnRune = false; hatMorgottRune = false; aktiveRune = "keine";
   questProgress = 0; medallionHalves = 0; fortressPlacedRegions = []; imKampf = false; gewaehlteKlasse = ""; aktionsSperre = false;
   playerHitsOnEnemy = 0; enemyIsStaggered = false; staggerVisualActive = false; nextHitBonusDamage = false;
   currentAffinity = "Keine"; affinityHits = 0; completedDungeonsCount = 0;
-  backpackItems = [null, null, null]; activeBuffs = []; inSubDungeon = false; mainMapState = null;
+  backpackItems = [null, null, null]; activeBuffs = []; inSubDungeon = false; mainMapState = null; towerEtage = 0;
   oeffneKlassenAuswahl();
 }
 
@@ -1207,8 +1246,11 @@ function waehleKlasseEngine(klasse) {
   basisAusweichChance = Math.min(0.75, basisAusweichChance + (__up.wendigkeit||0) * 0.025);
   seelenVergeben = false;
   spielerHp = spielerMaxHp; document.getElementById("popup-content").classList.remove("klassen-modal"); document.getElementById("popup-overlay").style.display = "none";
-  if (window.ER) ER.startRun(hardMode ? "hard" : "normal");
+  // Kategorie mitgeben, damit Challenge-Runs (tower/noarmor/noblaidd/autobattle/haligtree)
+  // in ihrer eigenen Bestenliste landen. Leeres activeChallenge -> normCat fällt auf normal/hard zurück.
+  if (window.ER) ER.startRun(hardMode ? "hard" : "normal", activeChallenge);
   speichereRun();
+  if (activeChallenge === "tower") { starteTowerModus(); return; }   // Tower: direkt in den Aufstieg statt Regionskarte
   updateUI();
 }
 
@@ -1314,8 +1356,8 @@ function updateUI() {
   if (buffsAktiv()) {
     bpStatus.style.display = "block";
     let cmpText = (window.i18n && window.i18n.getLang() === 'en') ? 'Battles' : 'Kämpfe';
-    finalHpMultiplier += 0.15 * buffStacks("hp");
-    runeRollBonus += 0.15 * buffStacks("dodge");
+    finalHpMultiplier += CONFIG.buffBonusProStack * buffStacks("hp");
+    runeRollBonus += CONFIG.buffBonusProStack * buffStacks("dodge");
     let teile = activeBuffs.filter(b => b.remaining > 0).map(b => {
       let ico = b.type === "hp" ? "❤️" : (b.type === "dodge" ? "💨" : "⚔️");
       return ico + " (" + b.remaining + ")";
@@ -1338,13 +1380,13 @@ function updateUI() {
   if (aktiveRune === "radahn")  { runeHpBonus += Math.round(spielerMaxHp * 0.50); runeDmgBonus += 20; }
   if (aktiveRune === "morgott") { finalHpMultiplier += 1.0; } 
   
-  let finaleAusweichChance = Math.min(hardMode ? 0.65 : 0.75, basisAusweichChance + tStats.extraRolle + runeRollBonus);
+  let finaleAusweichChance = Math.min(diffVal(CONFIG.ausweichenCap), basisAusweichChance + tStats.extraRolle + runeRollBonus);
   let finalMaxHp = berechneFinalMaxHp();
   if (spielerHp > finalMaxHp) spielerHp = finalMaxHp;
 
   let baseWeaponDmg = waffenSchaden + (waffenUpgrade * 5);
   let finalDmgMultiplier = 1.0 + tStats.bonusDmgPercent;
-  finalDmgMultiplier += 0.15 * buffStacks("dmg");
+  finalDmgMultiplier += CONFIG.buffBonusProStack * buffStacks("dmg");
   let finalDmg = Math.round((baseWeaponDmg + runeDmgBonus) * finalDmgMultiplier);
 
   document.getElementById("player-hp-bar").max = finalMaxHp; document.getElementById("player-hp-bar").value = spielerHp;
@@ -1437,7 +1479,9 @@ function updateUI() {
 
   if (imKampf) {
     document.getElementById("battle-view").style.display = "flex"; document.getElementById("map-view").style.display = "none";
-    if (activeChallenge === "autobattle") setTimeout(autoBattleTick, 600);
+    // Hinweis: Der Auto-Battle-Loop wird NICHT mehr hier gestartet (das erzeugte
+    // pro updateUI eine neue, parallele Timer-Kette). Start erfolgt einmalig am
+    // Kampfbeginn; autoBattleTick() ist gegen Mehrfachstart abgesichert.
     if (activeChallenge === "autobattle") { document.getElementById("atk-btn").style.display = "none"; document.getElementById("heal-btn").style.display = "none"; }
     document.getElementById("battle-player-hp").max = finalMaxHp; document.getElementById("battle-player-hp").value = spielerHp;
     document.getElementById("arena-player-hp-text").innerText = `${spielerHp} / ${finalMaxHp}`;
@@ -1570,6 +1614,7 @@ function klickeKnoten(ebene, knoten) {
     }
   }
   gegnerHp = gegnerMaxHp; imKampf = true; aktionsSperre = false; document.getElementById("battle-log").innerText = t("log_start") + gegnerNameLoc(gegnerName) + "!"; updateUI();
+  if (activeChallenge === "autobattle") autoBattleTick();   // Auto-Battle-Schleife einmalig starten
 }
 
 function oeffneDungeonEintrittPopup() {
@@ -1703,7 +1748,68 @@ function zeigeBurstEffekt(wrapper, affinity) {
   });
 }
 
-function spielerAngriff() {
+// ============================================================
+//  Gemeinsamer Gegner-Konter nach einer Spieler-Aktion.
+//  Wird von spielerAngriff() UND spielerHeilen() genutzt, damit die
+//  Ausweich-/Konter-Logik nur an EINER Stelle gepflegt werden muss.
+//  opts:
+//    windup       – true: Gegner holt sichtbar aus (nur nach Angriff)
+//    dmgVariance  – Funktion, die die Schadensstreuung liefert
+//    logSuccess / logFail / logStagger – i18n-Keys fuer die Logzeile
+//    cleanupDelay – ms bis Trefferanimation/Klassen entfernt werden
+// ============================================================
+async function gegnerKonter(opts) {
+  let playerWrapper = document.getElementById("player-sprite-wrapper");
+  let enemyWrapper  = document.getElementById("enemy-sprite-wrapper");
+
+  // Kampf bereits entschieden -> kein Konter mehr.
+  if (gegnerHp <= 0 || spielerHp <= 0) return;
+
+  // Gegner taumelt -> setzt mit seinem Angriff aus.
+  if (enemyIsStaggered) {
+    enemyIsStaggered = false;
+    document.getElementById("battle-log").innerText += t(opts.logStagger);
+    return;
+  }
+
+  // Optionale Aushol-Animation (nur nach einem Spieler-Angriff).
+  if (opts.windup) {
+    enemyWrapper.style.transform = "translateX(-40px)";
+    await wait(150);
+    enemyWrapper.style.transform = "translateX(0)";
+  }
+
+  let tStats = berechneTalismanStats();
+  let runeRollBonus = (aktiveRune === "godrick" ? 0.15 : 0.0) + CONFIG.buffBonusProStack * buffStacks("dodge");
+  let finaleAusweichChance = Math.min(diffVal(CONFIG.ausweichenCap), basisAusweichChance + tStats.extraRolle + runeRollBonus);
+  let ausgewichen = Math.random() < finaleAusweichChance;
+
+  if (ausgewichen) {
+    playerWrapper.classList.add("player-rolling");
+    zeigeFloatingZahl(playerWrapper, t("float_dodged"), "dmg-dodge");
+    document.getElementById("battle-log").innerText += t(opts.logSuccess);
+    updateUI();
+  } else {
+    let gSchaden = gegnerSchaden + opts.dmgVariance();
+    gSchaden = Math.round(gSchaden * (1 + tStats.bonusDmgTakenPercent) * (1 - ruestungReduktion));
+    gSchaden = Math.max(1, gSchaden);
+    spielerHp = Math.max(0, spielerHp - gSchaden);
+    playerWrapper.classList.add("enemy-hurt");
+    zeigeFloatingZahl(playerWrapper, "-" + gSchaden, "dmg-enemy");
+    document.getElementById("battle-log").innerText += t(opts.logFail, { name: gegnerNameLoc(gegnerName), dmg: gSchaden });
+    updateUI();
+  }
+
+  await wait(opts.cleanupDelay);
+  playerWrapper.classList.remove("enemy-hurt");
+  playerWrapper.classList.remove("player-rolling");
+  if (spielerHp <= 0) {
+    document.getElementById("battle-log").innerText = t("log_death");
+    zeigeTodesBildschirm();
+  }
+}
+
+async function spielerAngriff() {
   if (!imKampf || spielerHp <= 0 || aktionsSperre) return;
   staggerVisualActive = false;
   aktionsSperre = true; updateUI();
@@ -1712,17 +1818,17 @@ function spielerAngriff() {
   let tStats = berechneTalismanStats(); let runeDmgBonus = aktiveRune === "godrick" ? 10 : (aktiveRune === "radahn" ? 20 : 0);
   let baseWeaponDmg = waffenSchaden + (waffenUpgrade * 5);
   let finalDmgMultiplier = 1.0 + tStats.bonusDmgPercent;
-  finalDmgMultiplier += 0.15 * buffStacks("dmg");
+  finalDmgMultiplier += CONFIG.buffBonusProStack * buffStacks("dmg");
   let finalDmg = Math.round((baseWeaponDmg + runeDmgBonus) * finalDmgMultiplier);
   let bossMod = gibBossSchadensModifikator(); if (bossMod !== 0) finalDmg = Math.round(finalDmg * (1 + bossMod));
 
   let warBurst = false; let warBonus = false;
-  if (nextHitBonusDamage) { finalDmg = Math.round(finalDmg * 1.3); nextHitBonusDamage = false; warBonus = true; }
+  if (nextHitBonusDamage) { finalDmg = Math.round(finalDmg * CONFIG.staggerBonusSchaden); nextHitBonusDamage = false; warBonus = true; }
 
   if (currentAffinity !== "Keine") {
     affinityHits++;
     if (affinityHits === 5) {
-      let burstPct = completedDungeonsCount >= 3 ? 0.10 : (completedDungeonsCount === 2 ? 0.075 : 0.05);
+      let burstPct = completedDungeonsCount >= 3 ? CONFIG.affinityBurst.ab3Dungeons : (completedDungeonsCount === 2 ? CONFIG.affinityBurst.ab2Dungeons : CONFIG.affinityBurst.basis);
       let extraAffinityDamage = Math.round(finalDmg * burstPct); finalDmg += extraAffinityDamage; affinityHits = 0; warBurst = true;
       setTimeout(() => { document.getElementById("battle-log").innerText += t("affinity_burst_log", { aff: affLabel(currentAffinity), dmg: extraAffinityDamage }); }, 100);
     }
@@ -1733,79 +1839,64 @@ function spielerAngriff() {
 
   if (gegnerHp > 0) {
     playerHitsOnEnemy++;
-    if (playerHitsOnEnemy === (hardMode ? 5 : 4)) { enemyIsStaggered = true; staggerVisualActive = true; nextHitBonusDamage = true; playerHitsOnEnemy = 0; }
+    if (playerHitsOnEnemy === diffVal(CONFIG.staggerTreffer)) { enemyIsStaggered = true; staggerVisualActive = true; nextHitBonusDamage = true; playerHitsOnEnemy = 0; }
   }
 
-  setTimeout(() => { 
-    enemyWrapper.classList.add("enemy-hurt"); 
-    let zusatz = bossMod > 0 ? `  🎯 ${t("combat_weakness")} (+${Math.round(bossMod*100)}%)` : (bossMod < 0 ? `  🛡️ ${t("combat_resistance")} (${Math.round(bossMod*100)}%)` : "");
-    document.getElementById("battle-log").innerText = t("combat_attack_log", { weapon: waffenNameLoc(waffenName), dmg: schaden }) + zusatz; 
-    let floatKlasse = "dmg-normal";
-    if (bossMod > 0) floatKlasse = "dmg-weak"; else if (warBurst || warBonus) floatKlasse = "dmg-big"; else if (bossMod < 0) floatKlasse = "dmg-resist";
-    zeigeFloatingZahl(enemyWrapper, "-" + schaden, floatKlasse);
-    if (warBurst) zeigeBurstEffekt(enemyWrapper, currentAffinity); updateUI(); 
-  }, 150);
-  
-  setTimeout(() => { playerWrapper.classList.remove("attack-dash"); enemyWrapper.classList.remove("enemy-hurt"); if (gegnerHp <= 0) { kampfGewonnen(); } }, 350);
+  // --- Treffer-Animation (+150 ms) ---
+  await wait(150);
+  enemyWrapper.classList.add("enemy-hurt");
+  let zusatz = bossMod > 0 ? `  🎯 ${t("combat_weakness")} (+${Math.round(bossMod*100)}%)` : (bossMod < 0 ? `  🛡️ ${t("combat_resistance")} (${Math.round(bossMod*100)}%)` : "");
+  document.getElementById("battle-log").innerText = t("combat_attack_log", { weapon: waffenNameLoc(waffenName), dmg: schaden }) + zusatz;
+  let floatKlasse = "dmg-normal";
+  if (bossMod > 0) floatKlasse = "dmg-weak"; else if (warBurst || warBonus) floatKlasse = "dmg-big"; else if (bossMod < 0) floatKlasse = "dmg-resist";
+  zeigeFloatingZahl(enemyWrapper, "-" + schaden, floatKlasse);
+  if (warBurst) zeigeBurstEffekt(enemyWrapper, currentAffinity);
+  updateUI();
 
-  setTimeout(() => {
-    if (gegnerHp <= 0 || spielerHp <= 0) { aktionsSperre = false; return; }
-    if (enemyIsStaggered) {
-      enemyIsStaggered = false; document.getElementById("battle-log").innerText += t("stagger_alert");
-      aktionsSperre = false; updateUI(); return; 
-    }
+  // --- Anim-Reset + Sieg-Pruefung (+350 ms gesamt) ---
+  await wait(200);
+  playerWrapper.classList.remove("attack-dash"); enemyWrapper.classList.remove("enemy-hurt");
+  if (gegnerHp <= 0) { kampfGewonnen(); }   // kann gegnerHp neu fuellen (Boss-Phase) oder imKampf=false setzen
 
-    enemyWrapper.style.transform = "translateX(-40px)"; let runeRollBonus = aktiveRune === "godrick" ? 0.15 : 0.0;
-    runeRollBonus += 0.15 * buffStacks("dodge");
-    let finaleAusweichChance = Math.min(hardMode ? 0.65 : 0.75, basisAusweichChance + tStats.extraRolle + runeRollBonus);
-    let wuerfel = Math.random(); let ausgewichen = wuerfel < finaleAusweichChance;
-
-    setTimeout(() => {
-      enemyWrapper.style.transform = "translateX(0)";
-      if (ausgewichen) { playerWrapper.classList.add("player-rolling"); zeigeFloatingZahl(playerWrapper, t("float_dodged"), "dmg-dodge"); document.getElementById("battle-log").innerText += t("roll_success"); updateUI(); } 
-      else {
-        let gSchaden = gegnerSchaden + Math.floor(Math.random() * 4) - 1; gSchaden = Math.round(gSchaden * (1 + tStats.bonusDmgTakenPercent) * (1 - ruestungReduktion)); gSchaden = Math.max(1, gSchaden);
-        spielerHp = Math.max(0, spielerHp - gSchaden); playerWrapper.classList.add("enemy-hurt"); zeigeFloatingZahl(playerWrapper, "-" + gSchaden, "dmg-enemy");
-        document.getElementById("battle-log").innerText += t("roll_fail", { name: gegnerNameLoc(gegnerName), dmg: gSchaden }); updateUI();
-      }
-    }, 150);
-    setTimeout(() => { playerWrapper.classList.remove("enemy-hurt"); playerWrapper.classList.remove("player-rolling"); if (spielerHp <= 0) { document.getElementById("battle-log").innerText = t("log_death"); zeigeTodesBildschirm(); } aktionsSperre = false; updateUI(); }, 450);
-  }, 700);
+  // --- Gegner-Konter (+700 ms gesamt) ---
+  await wait(350);
+  if (bossPhaseWechsel) { bossPhaseWechsel = false; aktionsSperre = false; updateUI(); return; }  // frisch verwandelter Boss greift diese Runde nicht an
+  if (gegnerHp <= 0 || spielerHp <= 0) { aktionsSperre = false; return; }
+  await gegnerKonter({
+    windup: true,
+    dmgVariance: () => Math.floor(Math.random() * 4) - 1,
+    logSuccess: "roll_success",
+    logFail: "roll_fail",
+    logStagger: "stagger_alert",
+    cleanupDelay: 300
+  });
+  aktionsSperre = false; updateUI();
 }
 
-function spielerHeilen() {
+async function spielerHeilen() {
   if (!imKampf || spielerHp <= 0 || aktionsSperre) return;
-  if (spielerFlasks > 0) {
-    aktionsSperre = true;
-    let tStats = berechneTalismanStats();
-    let finalMaxHp = berechneFinalMaxHp();
-    let heilWert = Math.round(finalMaxHp * estusHeilProzent * (1 + tStats.bonusHealPercent));
-    spielerHp = Math.min(finalMaxHp, spielerHp + heilWert); spielerFlasks--;
-    if (window.ER) ER.flaskDrunk();
-    document.getElementById("battle-log").innerText = t("heal_log", { hp: heilWert }); updateUI();
-    let playerWrapper = document.getElementById("player-sprite-wrapper"); let enemyWrapper = document.getElementById("enemy-sprite-wrapper");
-    zeigeFloatingZahl(playerWrapper, "+" + heilWert, "dmg-heal");
+  if (spielerFlasks <= 0) return;
+  aktionsSperre = true;
+  let tStats = berechneTalismanStats();
+  let finalMaxHp = berechneFinalMaxHp();
+  let heilWert = Math.round(finalMaxHp * estusHeilProzent * (1 + tStats.bonusHealPercent));
+  spielerHp = Math.min(finalMaxHp, spielerHp + heilWert); spielerFlasks--;
+  if (window.ER) ER.flaskDrunk();
+  document.getElementById("battle-log").innerText = t("heal_log", { hp: heilWert }); updateUI();
+  let playerWrapper = document.getElementById("player-sprite-wrapper");
+  zeigeFloatingZahl(playerWrapper, "+" + heilWert, "dmg-heal");
 
-    setTimeout(() => {
-      if (gegnerHp <= 0 || spielerHp <= 0) { aktionsSperre = false; return; }
-      if (enemyIsStaggered) {
-        enemyIsStaggered = false; document.getElementById("battle-log").innerText += t("stagger_stuck");
-        aktionsSperre = false; updateUI(); return;
-      }
-      let runeRollBonus = aktiveRune === "godrick" ? 0.15 : 0.0;
-      runeRollBonus += 0.15 * buffStacks("dodge");
-      let finaleAusweichChance = Math.min(hardMode ? 0.65 : 0.75, basisAusweichChance + tStats.extraRolle + runeRollBonus);
-      let wuerfel = Math.random(); let ausgewichen = wuerfel < finaleAusweichChance;
-
-      if (ausgewichen) { playerWrapper.classList.add("player-rolling"); zeigeFloatingZahl(playerWrapper, t("float_dodged"), "dmg-dodge"); document.getElementById("battle-log").innerText += t("heal_roll_success"); updateUI(); } 
-      else {
-        let gSchaden = gegnerSchaden + Math.floor(Math.random() * 3); gSchaden = Math.round(gSchaden * (1 + tStats.bonusDmgTakenPercent) * (1 - ruestungReduktion));
-        gSchaden = Math.max(1, gSchaden); spielerHp = Math.max(0, spielerHp - gSchaden);
-        playerWrapper.classList.add("enemy-hurt"); zeigeFloatingZahl(playerWrapper, "-" + gSchaden, "dmg-enemy"); document.getElementById("battle-log").innerText += t("heal_roll_fail", { name: gegnerNameLoc(gegnerName), dmg: gSchaden }); updateUI();
-      }
-      setTimeout(() => { playerWrapper.classList.remove("enemy-hurt"); playerWrapper.classList.remove("player-rolling"); if (spielerHp <= 0) { document.getElementById("battle-log").innerText = t("log_death"); zeigeTodesBildschirm(); } aktionsSperre = false; updateUI(); }, 450);
-    }, 400);
-  }
+  // --- Gegner-Konter (+400 ms), Heilen hat keine Aushol-Animation ---
+  await wait(400);
+  await gegnerKonter({
+    windup: false,
+    dmgVariance: () => Math.floor(Math.random() * 3),
+    logSuccess: "heal_roll_success",
+    logFail: "heal_roll_fail",
+    logStagger: "stagger_stuck",
+    cleanupDelay: 450
+  });
+  aktionsSperre = false; updateUI();
 }
 
 function heileUndRegeneriereVoll(nurHp) {
@@ -1813,9 +1904,142 @@ function heileUndRegeneriereVoll(nurHp) {
   if (!nurHp) spielerFlasks = maxKlassenFlasks;
 }
 
+// ============================================================
+//  TOWER-MODUS  (challenge=tower)
+//  Endloser Aufstieg: Etage für Etage ein skalierender Kampf, dazwischen
+//  eine Belohnungswahl. Es gibt kein Ende – der Score ist die höchste Etage.
+// ============================================================
+const TOWER_REGIONEN = ["Limgrave", "Caelid", "Leyndell", "Mountaintops", "FarumAzula", "AshenCapital", "Haligtree"];
+let towerAngeboteneBelohnungen = [];
+
+// Optik wird alle 3 Etagen „härter", danach bleibt sie bei der letzten Region.
+function towerRegionFuerEtage(etage) {
+  let idx = Math.min(Math.floor((etage - 1) / 3), TOWER_REGIONEN.length - 1);
+  return TOWER_REGIONEN[idx];
+}
+
+function towerGegnerStats(etage) {
+  let c = CONFIG.tower;
+  let hardF = hardMode ? c.hardFaktor : 1;
+  let hp  = Math.round(c.hpBasis  * (1 + c.hpProEtage  * (etage - 1)) * Math.pow(c.hpExpo,  etage - 1) * hardF);
+  let dmg = Math.round(c.dmgBasis * (1 + c.dmgProEtage * (etage - 1)) * Math.pow(c.dmgExpo, etage - 1) * hardF);
+  return { hp: Math.max(1, hp), dmg: Math.max(1, dmg) };
+}
+
+function starteTowerModus() {
+  towerEtage = 1;
+  netzKarte = [];               // kein Regions-Netz -> Karten-Render wird zum No-Op
+  inSubDungeon = false; mainMapState = null;
+  besiegteWaechter = 0; questProgress = 0; completedDungeonsCount = 0;
+  starteTowerKampf();
+}
+
+function starteTowerKampf() {
+  document.getElementById("popup-overlay").style.display = "none";
+  let etage = towerEtage;
+  aktuelleRegion = towerRegionFuerEtage(etage);
+  let stats = towerGegnerStats(etage);
+  let istMiniboss = (etage % CONFIG.tower.minibossAlle) === 0;
+
+  // Kampf-Flags zurücksetzen (analog klickeKnoten)
+  playerHitsOnEnemy = 0; enemyIsStaggered = false; staggerVisualActive = false;
+  nextHitBonusDamage = false; affinityHits = 0; bossPhaseWechsel = false;
+
+  if (istMiniboss) {
+    let mb = gibAktuellenMiniboss();   // richtet sich nach der Etagen-Region -> Name & Bild bleiben konsistent zu updateUI
+    aktuellerKnotenTyp = 14;
+    gegnerName = mb.name;
+    gegnerMaxHp = Math.round(stats.hp * CONFIG.tower.minibossHpMult);
+    gegnerSchaden = Math.round(stats.dmg * CONFIG.tower.minibossDmgMult);
+  } else {
+    // wechselnde Gegnertypen: Wächter (2) / Elite (1) / Invader (3)
+    let typen = [2, 1, 3];
+    aktuellerKnotenTyp = typen[etage % typen.length];
+    let cfg = gebietsGegnerKonfig[aktuelleRegion] || gebietsGegnerKonfig.Limgrave;
+    gegnerName = aktuellerKnotenTyp === 1 ? cfg.eliteName : (aktuellerKnotenTyp === 3 ? cfg.invaderName : cfg.waechterName);
+    gegnerMaxHp = stats.hp; gegnerSchaden = stats.dmg;
+  }
+
+  gegnerHp = gegnerMaxHp; imKampf = true; aktionsSperre = false;
+  document.getElementById("battle-log").innerText = t("log_start") + gegnerNameLoc(gegnerName) + "!";
+  speichereRun(); updateUI();
+}
+
+function towerKampfGewonnen() {
+  if (window.ER) {
+    ER.fightWon();
+    ER.towerReached(towerEtage);
+    if ((towerEtage % CONFIG.tower.minibossAlle) === 0) ER.minibossKilled();
+  }
+  activeBuffs.forEach(b => { if (b.remaining > 0) b.remaining--; }); activeBuffs = activeBuffs.filter(b => b.remaining > 0);
+
+  imKampf = false; aktionsSperre = false;
+
+  // Teil-Heilung zwischen den Etagen
+  let finalMaxHp = berechneFinalMaxHp();
+  spielerHp = Math.min(finalMaxHp, spielerHp + Math.round(finalMaxHp * CONFIG.tower.heilProEtage));
+
+  let geschafft = towerEtage;
+  towerEtage++;
+  oeffneTowerBelohnung(geschafft);
+}
+
+// Pool an möglichen Belohnungen; tier steigt mit der Höhe (bessere Talismane).
+function towerBelohnungsPool(etage) {
+  let tier = Math.min(3, Math.floor(etage / 6));
+  let pool = [
+    { icon: "⚔️", titel: L("Waffe schärfen (+1)", "Sharpen weapon (+1)"),        apply: () => { waffenUpgrade++; } },
+    { icon: "🗡️", titel: L("Neue Zufallswaffe", "New random weapon"),            apply: () => { setzeAusgeruesteteWaffe(rolleZufallsWaffe()); } },
+    { icon: "❤️", titel: L("Max-HP +10 %", "Max HP +10%"),                       apply: () => { let b = Math.round(spielerMaxHp * 0.10); spielerMaxHp += b; spielerHp += b; } },
+    { icon: "🧪", titel: L("Voll heilen + Flakons", "Full heal + flasks"),        apply: () => { heileUndRegeneriereVoll(false); } },
+    { icon: "🔥", titel: L("Kampf-Buff (10 Kämpfe)", "Combat buff (10 fights)"),   apply: () => { let ty = ["dmg", "dodge", "hp"][Math.floor(Math.random() * 3)]; activeBuffs.push({ type: ty, remaining: 10 }); } },
+    { icon: "💍", titel: L("Talisman finden", "Find a talisman"),                  apply: () => {
+        let id = guteTalismanIds[Math.floor(Math.random() * guteTalismanIds.length)];
+        let tal = erzeugeGutenTalisman(id, tier);
+        let idx = -1;
+        for (let i = 0; i < maxTalismanSlots; i++) { if (!ausgeruesteteTalismane[i]) { idx = i; break; } }
+        if (idx < 0) idx = 0;
+        ausgeruesteteTalismane[idx] = tal;
+      } }
+  ];
+  return pool;
+}
+
+function oeffneTowerBelohnung(etage) {
+  let overlay = document.getElementById("popup-overlay"); let content = document.getElementById("popup-content");
+  let pool = towerBelohnungsPool(etage);
+  for (let i = pool.length - 1; i > 0; i--) { let j = Math.floor(Math.random() * (i + 1)); let tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp; }
+  towerAngeboteneBelohnungen = pool.slice(0, 3);
+
+  let karten = towerAngeboteneBelohnungen.map(function (b, i) {
+    return '<div onclick="towerBelohnungWaehlen(' + i + ')" '
+      + 'style="cursor:pointer; width:120px; padding:18px 10px; background:rgba(0,0,0,0.4); border:1px solid var(--border-color); border-radius:7px; transition:all 0.15s ease; text-transform:none; font-family:sans-serif;" '
+      + 'onmouseover="this.style.borderColor=\'var(--gold)\'; this.style.background=\'rgba(205,163,79,0.14)\'; this.style.transform=\'translateY(-3px)\';" '
+      + 'onmouseout="this.style.borderColor=\'var(--border-color)\'; this.style.background=\'rgba(0,0,0,0.4)\'; this.style.transform=\'translateY(0)\';">'
+      + '<div style="font-size:2.1rem; line-height:1;">' + b.icon + '</div>'
+      + '<div style="margin-top:10px; font-size:0.82rem; color:#e6dcc4; font-weight:bold;">' + b.titel + '</div>'
+      + '</div>';
+  }).join("");
+
+  content.innerHTML =
+    '<div style="font-size:0.72rem; letter-spacing:3px; color:#8c6d2d; text-transform:uppercase; font-family:sans-serif;">🗼 ' + L("Turm des Aufstiegs", "Ascension Tower") + '</div>'
+    + '<h3 style="color: var(--gold); font-size:1.7rem; margin:6px 0 2px; letter-spacing:2px; font-family: \'Mantinia\', serif;">' + L("Etage", "Floor") + ' ' + etage + ' ' + L("bezwungen", "cleared") + '</h3>'
+    + '<p style="color:#aaa; font-size:0.9rem; font-family:sans-serif; margin-top:4px;">' + L("Wähle eine Belohnung für den weiteren Aufstieg.", "Choose one reward to aid your ascent.") + '</p>'
+    + '<div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin:18px 0 4px;">' + karten + '</div>';
+  overlay.style.display = "flex";
+}
+
+function towerBelohnungWaehlen(i) {
+  let b = towerAngeboteneBelohnungen[i];
+  if (b && typeof b.apply === "function") b.apply();
+  starteTowerKampf();
+}
+
 function kampfGewonnen() {
+  if (activeChallenge === "tower") { towerKampfGewonnen(); return; }
   if (gegnerName === "Radagon von der Goldenen Ordnung") {
     gegnerName = "Eldenbiest"; gegnerMaxHp = 2500; gegnerHp = 2500; gegnerSchaden = 120;
+    bossPhaseWechsel = true;   // frisch verwandelter Boss greift nicht sofort an
     document.getElementById("battle-log").innerText = t("elden_beast_transition"); aktionsSperre = false; updateUI(); return;
   }
 
@@ -1870,6 +2094,7 @@ function kampfGewonnen() {
   if (gegnerName === "Malenia, Blade of Miquella") {
     document.getElementById("battle-log").innerText = t("malenia_phase2_transition");
     gegnerName = "Malenia, Goddess of Rot"; gegnerMaxHp = Math.round(gegnerMaxHp * 1.3); gegnerHp = gegnerMaxHp; gegnerSchaden = Math.round(gegnerSchaden * 1.4);
+    bossPhaseWechsel = true;   // Phasenwechsel -> kein Sofort-Konter
     document.getElementById("enemy-name").innerText = gegnerNameLoc(gegnerName);
     document.getElementById("enemy-img").src = "images/malenia-2nd-phase-flying.avif";
     document.getElementById("battle-enemy-hp").max = gegnerMaxHp; document.getElementById("battle-enemy-hp").value = gegnerHp;
@@ -1931,7 +2156,7 @@ function berechneFinalMaxHp() {
   let runeHpBonus = (aktiveRune === "godrick" ? Math.round(spielerMaxHp * 0.25) : 0)
                   + (aktiveRune === "radahn"  ? Math.round(spielerMaxHp * 0.50) : 0);
   let mult = 1.0 + tStats.bonusHpPercent
-           + (0.15 * buffStacks("hp"))
+           + (CONFIG.buffBonusProStack * buffStacks("hp"))
            + (aktiveRune === "morgott" ? 1.0 : 0.0);
   return Math.round((spielerMaxHp + runeHpBonus) * mult);
 }
@@ -2138,11 +2363,23 @@ function toggleBattleLog() {
 }
 
 // Auto-Battle
-function autoBattleTick() {
-  if (!imKampf || spielerHp <= 0 || gegnerHp <= 0) return;
-  if (aktionsSperre) { setTimeout(autoBattleTick, 300); return; }
-  spielerAngriff();
-  setTimeout(autoBattleTick, 900);
+// Eine einzige selbstlaufende Schleife. Das autoBattleRunning-Flag stellt
+// sicher, dass nie zwei Schleifen gleichzeitig laufen, egal wie oft
+// autoBattleTick() aufgerufen wird (z.B. bei Boss-Phasenwechseln).
+async function autoBattleTick() {
+  if (autoBattleRunning) return;
+  autoBattleRunning = true;
+  try {
+    while (imKampf && spielerHp > 0 && activeChallenge === "autobattle") {
+      // Warten, bis der Gegner wieder vorhanden und keine Aktion gesperrt ist
+      // (deckt Boss-Phasenwechsel ab, bei denen gegnerHp kurz 0 ist).
+      if (gegnerHp <= 0 || aktionsSperre) { await wait(250); continue; }
+      await spielerAngriff();
+      await wait(500);
+    }
+  } finally {
+    autoBattleRunning = false;
+  }
 }
 
 // Challenge-Badge im Spiel anzeigen
@@ -2151,6 +2388,7 @@ function updateChallengeBadge() {
   if (!badge) return;
   if (activeChallenge) {
     badge.style.display = "block";
+    if (activeChallenge === "tower") { badge.innerText = "🗼 " + L("ETAGE", "FLOOR") + " " + (towerEtage || 1); return; }
     let labels = { noarmor: "🛡️ NO ARMOR", noblaidd: "🐺 NO BLAIDD", autobattle: "⚡ AUTO-BATTLE", haligtree: "🌳 HALIGTREE" };
     badge.innerText = labels[activeChallenge] || ("🏴 " + activeChallenge.toUpperCase());
   } else { badge.style.display = "none"; }
