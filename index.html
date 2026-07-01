@@ -651,7 +651,7 @@
   var ARMOR_IMG = { "Albinauric Set":"images/armor/albinauric_set.png","Bloodhound Knight Set":"images/armor/bloodhound_set.png","Cleanrot Set":"images/armor/cleanrotf.png","Godrick Soldier Set":"images/armor/godrick_soldier_set.png","Briar Set":"images/armor/briar_set.png","Black Knife Set":"images/armor/black_knife_set.png","Haligtree Knight Set":"images/armor/haligtree_knight_set.png","General Radahn Set":"images/armor/radahn_set.png","Crucible Axe Set":"images/armor/crucible_knight_set.png" };
   window.imgFallback = function(el, emoji, size){ var sp=document.createElement("span"); sp.textContent=emoji; sp.style.fontSize=(size||48)+"px"; sp.style.lineHeight="1"; if(el.parentNode) el.parentNode.replaceChild(sp, el); };
   function itemImgHtml(typ, item, size){ var src = typ==="waffe" ? weaponImg(item.name) : (ARMOR_IMG[item.name]||""); var fb = typ==="waffe" ? "🗡️" : "🛡️"; if(!src) return '<span style="font-size:'+size+'px;line-height:1;">'+fb+'</span>'; return '<img src="'+src+'" alt="" style="width:'+size+'px;height:'+size+'px;object-fit:contain;" onerror="imgFallback(this,&#39;'+fb+'&#39;,'+size+')">'; }
-  var CHEST_COST = 300;   // Preis pro Truhe (Duplikat erstattet die Hälfte)
+  var CHEST_COST = 0;   // Preis pro Truhe (Duplikat erstattet die Hälfte)
   var PITY_THRESHOLD = 4; // nach so vielen Duplikaten in Folge ist die nächste Truhe garantiert ein NEUES Item
   function pityGet(m, typ){ if(!m.chestPity||typeof m.chestPity!=="object") m.chestPity={waffe:0,ruestung:0}; return m.chestPity[typ]||0; }
   function pitySet(m, typ, v){ if(!m.chestPity||typeof m.chestPity!=="object") m.chestPity={waffe:0,ruestung:0}; m.chestPity[typ]=v; }
