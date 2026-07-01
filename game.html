@@ -7,8 +7,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-  <script src="lang.js?v=1.4"></script>
-  <script src="eldenrogue-online.js?v=1.4"></script>
+  <script src="lang.js?v=1.5"></script>
+  <script src="eldenrogue-online.js?v=1.5"></script>
   <style>
     /* Lokale Font-Einbindung aus dem fonts-Ordner */
     @font-face {
@@ -1026,7 +1026,7 @@ window.addEventListener('resize', zeichneLinien);
 // Haligtree-Challenge: 2 Festungen auf die Karte setzen (max 1 pro Region)
 let fortressPlacedRegions = [];
 function platziereFestungen(karte, regionName) {
-  if (activeChallenge !== "haligtree") return karte;
+  if (activeChallenge !== "" && activeChallenge !== "haligtree") return karte;   // Medaillen-Jagd jetzt im Normal-/Hard-Run (nicht in anderen Challenges)
   if (fortressPlacedRegions.length >= 2) return karte;
   if (fortressPlacedRegions.includes(regionName)) return karte;
   // Regionen 1-5 (Limgrave bis FarumAzula), Chance: 60% pro Region
@@ -1421,7 +1421,7 @@ function updateUI() {
   // Medallion display
   let medalDisp = document.getElementById("medallion-display");
   if (medalDisp) {
-    if (activeChallenge === "haligtree") {
+    if (activeChallenge === "" || activeChallenge === "haligtree") {
       medalDisp.style.display = "block";
       document.getElementById("medal-left").style.opacity = medallionHalves >= 1 ? "1" : "0.15";
       document.getElementById("medal-right").style.opacity = medallionHalves >= 2 ? "1" : "0.15";
@@ -1623,10 +1623,6 @@ function klickeKnoten(ebene, knoten) {
       else if (aktuelleRegion === "Leyndell") { gegnerName = "Morgott, der Omenkönig"; gegnerMaxHp = 680; gegnerSchaden = 45; }
       else if (aktuelleRegion === "Mountaintops") { gegnerName = "Feuerriese"; gegnerMaxHp = 920; gegnerSchaden = 58; }
       else if (aktuelleRegion === "FarumAzula") { gegnerName = "Maliketh, die Schwarze Klinge"; gegnerMaxHp = 1350; gegnerSchaden = 75; }
-      else if (aktuelleRegion === "AshenCapital" && activeChallenge === "haligtree" && medallionHalves >= 2) {
-        aktuelleRegion = "Haligtree"; aktuelleEbene = 1; geloesieKnotenIds = []; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("Haligtree");
-        oeffneStatPopup(t("haligtree_enter_title"), t("haligtree_enter_desc"), 1); return;
-      }
       else if (aktuelleRegion === "AshenCapital") { gegnerName = "Gideon Ofnir, der Allwissende"; gegnerMaxHp = 1600; gegnerSchaden = 85; }
       else if (aktuelleRegion === "Haligtree") {
         gegnerName = "Malenia, Blade of Miquella"; gegnerMaxHp = Math.round(2800 * rMult); gegnerSchaden = Math.round(120 * rMult);
@@ -2059,6 +2055,37 @@ function towerBelohnungWaehlen(i) {
   starteTowerKampf();
 }
 
+// ============================================================
+//  HALIGTREE-WAHL  (nach Gideon, wenn beide Medaillonhälften gefunden wurden)
+//  Optionaler Abstecher: Haligtree betreten und sich Malenia stellen (alternatives
+//  Ende), oder direkt zum Eldenthron weiterziehen.
+// ============================================================
+function oeffneHaligtreeWahl() {
+  let overlay = document.getElementById("popup-overlay"); let content = document.getElementById("popup-content");
+  content.innerHTML =
+    '<div style="font-size:0.72rem; letter-spacing:3px; color:#2e8b57; text-transform:uppercase; font-family:sans-serif;">🌳 ' + L("Geheimer Pfad", "Secret Path") + '</div>'
+    + '<h3 style="color:#2ecc71; font-size:1.6rem; margin:6px 0 2px; letter-spacing:1px; font-family:\'Mantinia\', serif;">' + L("Der Haligtree ruft", "The Haligtree Calls") + '</h3>'
+    + '<p style="color:#b5a98f; font-size:0.9rem; font-family:sans-serif; margin-top:6px; line-height:1.5;">' + L("Du trägst beide Hälften des geheimen Medaillons. Betrete den verborgenen Haligtree und stelle dich <b>Malenia</b> – oder ziehe direkt weiter zum Eldenthron.", "You carry both halves of the secret medallion. Enter the hidden Haligtree and face <b>Malenia</b> — or press on to the Elden Throne.") + '</p>'
+    + '<div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin:20px 0 4px;">'
+    +   '<button class="btn-modal-action" style="border-color:#2ecc71; color:#2ecc71;" onclick="betreteHaligtreeVonWahl()">🌳 ' + L("Haligtree betreten", "Enter the Haligtree") + '</button>'
+    +   '<button class="btn-modal-action" onclick="weiterZumThronVonWahl()">👑 ' + L("Weiter zum Eldenthron", "On to the Elden Throne") + '</button>'
+    + '</div>'
+    + '<p style="color:#666; font-size:0.74rem; font-family:sans-serif; margin-top:8px;">' + L("Achtung: Malenia ist ein brutaler optionaler Bosskampf. Überlebst du ihn, geht es normal weiter zum Eldenthron.", "Beware: Malenia is a brutal optional fight. Survive her and you continue on to the Elden Throne.") + '</p>';
+  overlay.style.display = "flex";
+}
+
+function betreteHaligtreeVonWahl() {
+  aktuelleRegion = "Haligtree"; aktuelleEbene = 1; geloesieKnotenIds = []; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("Haligtree");
+  speichereRun();
+  oeffneStatPopup(t("haligtree_enter_title"), t("haligtree_enter_desc"), 1);
+}
+
+function weiterZumThronVonWahl() {
+  aktuelleRegion = "EldenThrone"; aktuelleEbene = 1; geloesieKnotenIds = []; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("EldenThrone");
+  speichereRun();
+  oeffneStatPopup(t("boss_gideon_title"), t("boss_gideon_win"), 1);
+}
+
 function kampfGewonnen() {
   if (activeChallenge === "tower") { towerKampfGewonnen(); return; }
   if (gegnerName === "Radagon von der Goldenen Ordnung") {
@@ -2112,7 +2139,10 @@ function kampfGewonnen() {
   if (gegnerName === "Morgott, der Omenkönig") { hatMorgottRune = true; if (hardMode) maxTalismanSlots = Math.max(maxTalismanSlots, 3); aktuelleRegion = "Mountaintops"; aktuelleEbene = 1; geloesieKnotenIds = []; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("Mountaintops"); oeffneStatPopup(t("boss_morgott_title"), t("boss_morgott_win"), 1); return; }
   if (gegnerName === "Feuerriese") { maxWaffenSlots = hardMode ? 1 : 2; aktuelleRegion = "FarumAzula"; aktuelleEbene = 1; geloesieKnotenIds = []; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("FarumAzula"); oeffneStatPopup(t("boss_giant_title"), t("boss_giant_win"), 1); return; }
   if (gegnerName === "Maliketh, die Schwarze Klinge") { maxTalismanSlots = 4; aktuelleRegion = "AshenCapital"; aktuelleEbene = 1; geloesieKnotenIds = []; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("AshenCapital"); oeffneStatPopup(t("boss_maliketh_title"), t("boss_maliketh_win"), 1); return; }
-  if (gegnerName === "Gideon Ofnir, der Allwissende") { aktuelleRegion = "EldenThrone"; aktuelleEbene = 1; geloesieKnotenIds = []; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("EldenThrone"); oeffneStatPopup(t("boss_gideon_title"), t("boss_gideon_win"), 1); return; }
+  if (gegnerName === "Gideon Ofnir, der Allwissende") {
+    if (medallionHalves >= 2) { oeffneHaligtreeWahl(); return; }   // beide Medaillonhälften -> Haligtree als Option anbieten
+    aktuelleRegion = "EldenThrone"; aktuelleEbene = 1; geloesieKnotenIds = []; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("EldenThrone"); oeffneStatPopup(t("boss_gideon_title"), t("boss_gideon_win"), 1); return;
+  }
   if (gegnerName === "Godfrey, der Erste Eldenlord") { oeffneStatPopup(t("boss_godfrey_title"), t("boss_godfrey_win"), naechsteEbene); return; }
   // Malenia Phase 2
   if (gegnerName === "Malenia, Blade of Miquella") {
@@ -2126,10 +2156,11 @@ function kampfGewonnen() {
     if (activeChallenge === "autobattle") setTimeout(autoBattleTick, 900);
     aktionsSperre = false; updateUI(); return;
   }
-  // Malenia Phase 2 besiegt = Haligtree Ending
+  // Malenia Phase 2 besiegt -> weiter zum Eldenthron (Kill wird oben im ER-Statistikblock erfasst; kein gameCompleted, der Run läuft weiter)
   if (gegnerName === "Malenia, Goddess of Rot") {
-    if (window.ER) { ER.bossKilled("Malenia, Goddess of Rot"); ER.gameCompleted(); if (activeChallenge) ER.challengeCompleted(activeChallenge); }
-    oeffneAbschlussPopup(t("malenia_victory_title"), t("malenia_victory_desc")); return;
+    aktuelleRegion = "EldenThrone"; aktuelleEbene = 1; geloesieKnotenIds = []; aktuellerKnotenId = null; netzKarte = generiereRautenNetz("EldenThrone");
+    oeffneStatPopup(L("Malenia bezwungen", "Malenia Defeated"), L("Die Klinge Miquellas ist gefallen. Nun führt dein Weg zum Eldenthron.", "Miquella's blade has fallen. Now your path leads on to the Elden Throne."), 1);
+    return;
   }
 
   if (gegnerName === "Eldenbiest") { oeffneAbschlussPopup(t("elden_lord_title"), t("boss_beast_win")); return; }
