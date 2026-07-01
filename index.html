@@ -315,17 +315,6 @@
         <a href="#" onclick="return checkOverwrite('game.html?challenge=autobattle&amp;mode=hard')" class="btn-mini" style="border-color:#e74c3c; color:#e74c3c;">Hard</a>
       </div>
     </div>
-    <div class="challenge-card" style="border-color: var(--gold-dark);">
-      <div class="ch-icon">🌳</div>
-      <div>
-        <div class="ch-name" id="ch-haligtree-name" style="color:#2ecc71;">Haligtree</div>
-        <div class="ch-desc" id="ch-haligtree-desc">Finde 2 Festungen und betritt den geheimen Haligtree.</div>
-      </div>
-      <div class="ch-btns">
-        <a href="#" onclick="return checkOverwrite('game.html?challenge=haligtree')" class="btn-mini" style="border-color:#2ecc71; color:#2ecc71;">Normal</a>
-        <a href="#" onclick="return checkOverwrite('game.html?challenge=haligtree&amp;mode=hard')" class="btn-mini" style="border-color:#e74c3c; color:#e74c3c;">Hard</a>
-      </div>
-    </div>
     <div style="color:#666; font-size:0.75rem; font-family:sans-serif; text-align:center; margin-top:14px;" id="ch-footer">Weitere Challenges kommen bald…</div>
   </div>
 </div>
@@ -418,8 +407,6 @@
     document.getElementById("ch-noblaidd-desc").innerText = t("challenge_noblaidd_desc");
     document.getElementById("ch-auto-name").innerText = t("challenge_autobattle");
     document.getElementById("ch-auto-desc").innerText = t("challenge_autobattle_desc");
-    document.getElementById("ch-haligtree-name").innerText = t("challenge_haligtree");
-    document.getElementById("ch-haligtree-desc").innerText = t("challenge_haligtree_desc");
     document.getElementById("ch-footer").innerText = lang === 'en' ? "More challenges coming soon…" : "Weitere Challenges kommen bald…";
     document.getElementById("btn-ch-text").innerText = t("challenge_title");
     // Battle Tower button + guide
@@ -484,8 +471,7 @@
     ["tower",      "lb_cat_tower"],
     ["noarmor",    "challenge_noarmor"],
     ["noblaidd",   "challenge_noblaidd"],
-    ["autobattle", "challenge_autobattle"],
-    ["haligtree",  "challenge_haligtree"]
+    ["autobattle", "challenge_autobattle"]
   ];
   var lbKategorieAktiv = "normal";
   function fuelleLbKategorien(t) {
