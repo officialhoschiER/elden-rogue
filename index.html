@@ -85,6 +85,11 @@
     .btn-tower::after { content: none; }
     #btn-tower { position: relative; overflow: hidden; }
     #btn-tower::after { content: "⚔️"; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 1rem; opacity: 0.7; }
+    /* "Coming Soon"-Zustand (Battle Tower vorerst deaktiviert) */
+    .coming-soon-btn { opacity: 0.72; cursor: not-allowed !important; pointer-events: none; }
+    .coming-soon-btn::after { content: none !important; }
+    .coming-soon-btn #btn-tower-label { filter: grayscale(1); opacity: 0.7; }
+    .cs-badge { display:inline-block; margin-left:10px; padding:2px 9px; border:1px solid #e6a23c; border-radius:20px; background:rgba(230,162,60,0.16); color:#e6a23c; font-family:sans-serif; font-size:0.62rem; font-weight:bold; letter-spacing:1.5px; vertical-align:middle; }
 
     .tower-guide-list { list-style: none; padding: 0; margin: 16px 0; text-align: left; }
     .tower-guide-list li { font-family: sans-serif; font-size: 0.86rem; color: #cdbfa3; line-height: 1.5; padding: 9px 0 9px 26px; border-bottom: 1px solid rgba(230,162,60,0.12); position: relative; }
@@ -209,7 +214,7 @@
   <a href="game.html" class="btn-main btn-normal" id="btn-normal" onclick="return checkOverwrite('game.html')">Normaler Modus</a>
   <a href="game.html?mode=hard" class="btn-main btn-hard-active" id="btn-hard" onclick="return checkOverwrite('game.html?mode=hard')">Hard Mode</a>
 
-  <button class="btn-main btn-tower" id="btn-tower" onclick="openTowerGuide()">🏯 Battle Tower</button>
+  <button class="btn-main btn-tower coming-soon-btn" id="btn-tower" disabled aria-disabled="true"><span id="btn-tower-label">🏯 Battle Tower</span><span class="cs-badge">COMING SOON</span></button>
 
   <a href="game.html?resume=true" class="btn-main btn-continue" id="btn-continue" style="display:none;">▶ Run fortsetzen</a>
 
@@ -418,7 +423,7 @@
     document.getElementById("ch-footer").innerText = lang === 'en' ? "More challenges coming soon…" : "Weitere Challenges kommen bald…";
     document.getElementById("btn-ch-text").innerText = t("challenge_title");
     // Battle Tower button + guide
-    document.getElementById("btn-tower").innerText = t("tower_btn");
+    document.getElementById("btn-tower-label").innerText = t("tower_btn");
     document.getElementById("tg-title").innerText = t("tower_guide_title");
     document.getElementById("tg-sub").innerText = t("tower_guide_sub");
     for (var i = 1; i <= 6; i++) document.getElementById("tg-l" + i).innerHTML = t("tower_guide_l" + i);
@@ -651,7 +656,7 @@
   var ARMOR_IMG = { "Albinauric Set":"images/armor/albinauric_set.png","Bloodhound Knight Set":"images/armor/bloodhound_set.png","Cleanrot Set":"images/armor/cleanrotf.png","Godrick Soldier Set":"images/armor/godrick_soldier_set.png","Briar Set":"images/armor/briar_set.png","Black Knife Set":"images/armor/black_knife_set.png","Haligtree Knight Set":"images/armor/haligtree_knight_set.png","General Radahn Set":"images/armor/radahn_set.png","Crucible Axe Set":"images/armor/crucible_knight_set.png" };
   window.imgFallback = function(el, emoji, size){ var sp=document.createElement("span"); sp.textContent=emoji; sp.style.fontSize=(size||48)+"px"; sp.style.lineHeight="1"; if(el.parentNode) el.parentNode.replaceChild(sp, el); };
   function itemImgHtml(typ, item, size){ var src = typ==="waffe" ? weaponImg(item.name) : (ARMOR_IMG[item.name]||""); var fb = typ==="waffe" ? "🗡️" : "🛡️"; if(!src) return '<span style="font-size:'+size+'px;line-height:1;">'+fb+'</span>'; return '<img src="'+src+'" alt="" style="width:'+size+'px;height:'+size+'px;object-fit:contain;" onerror="imgFallback(this,&#39;'+fb+'&#39;,'+size+')">'; }
-  var CHEST_COST = 0;   // Preis pro Truhe (Duplikat erstattet die Hälfte)
+  var CHEST_COST = 300;   // Preis pro Truhe (Duplikat erstattet die Hälfte)
   var PITY_THRESHOLD = 4; // nach so vielen Duplikaten in Folge ist die nächste Truhe garantiert ein NEUES Item
   function pityGet(m, typ){ if(!m.chestPity||typeof m.chestPity!=="object") m.chestPity={waffe:0,ruestung:0}; return m.chestPity[typ]||0; }
   function pitySet(m, typ, v){ if(!m.chestPity||typeof m.chestPity!=="object") m.chestPity={waffe:0,ruestung:0}; m.chestPity[typ]=v; }
@@ -829,22 +834,19 @@
       html += truheCard("waffe", m);
       html += truheCard("ruestung", m);
     } else {
-      html += '<p style="color:#aaa;font-size:0.82rem;font-family:sans-serif;margin-top:0;">' + shopL("Skins sind vorerst Platzhalter (Emojis). Bald: neue Starterklassen & Skins aus anderen FromSoft-Spielen.","Skins are placeholders for now (emojis). Coming soon: new starter classes & skins from other FromSoft games.") + '</p>';
+      html += '<p style="color:#aaa;font-size:0.82rem;font-family:sans-serif;margin-top:0;">' + shopL("Skins & neue Starterklassen sind in Arbeit. Bald: Skins aus anderen FromSoft-Spielen.","Skins & new starter classes are in the works. Coming soon: skins from other FromSoft games.") + '</p>';
+      html += '<div style="position:relative;">';
+      html += '<div style="opacity:0.32;filter:grayscale(1);pointer-events:none;user-select:none;">';
       for (var s=0;s<SHOP_SKINS.length;s++) {
         var sk = SHOP_SKINS[s]; var col3 = RARITY_COL[sk.rarity];
-        var hat3 = sk.id==="none" || m.unlockedSkins.indexOf(sk.id) >= 0;
-        var aktiv3 = m.activeSkinId === sk.id || (sk.id==="none" && !m.activeSkinId);
         var links3 = '<span style="font-size:1.7rem;width:34px;text-align:center;flex-shrink:0;">' + sk.emoji + '</span>'
           + '<div style="flex:1;"><strong style="color:' + col3 + ';">' + shopL(sk.de[0],sk.de[1]) + '</strong><br><span style="color:#9aa0a6;font-size:0.74rem;">' + shopL(RARITY_NAME[sk.rarity][0],RARITY_NAME[sk.rarity][1]) + '</span></div>';
-        if (!hat3) {
-          var ok3 = m.seelen>=sk.cost;
-          html += zeile(links3 + '<span style="color:' + (ok3?'#cda34f':'#777') + ';font-weight:bold;white-space:nowrap;">✨ ' + sk.cost + '</span>',
-            { click: ok3?("shopSkinKlick('"+sk.id+"')"):null, dim:!ok3, border: col3 });
-        } else {
-          html += zeile(links3 + '<span style="color:' + (aktiv3?'#54d98c':'#888') + ';font-weight:bold;font-size:0.8rem;white-space:nowrap;">' + (aktiv3?shopL("AKTIV","ACTIVE"):shopL("anlegen","equip")) + '</span>',
-            { click:"shopSkinKlick('"+sk.id+"')", border: aktiv3?'var(--gold)':col3 });
-        }
+        html += zeile(links3 + '<span style="color:#777;font-weight:bold;font-size:0.8rem;white-space:nowrap;">✨ ' + sk.cost + '</span>', { border: col3 });
       }
+      html += '</div>';
+      html += '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">'
+        + '<div style="padding:10px 24px;border:1px solid #e6a23c;border-radius:30px;background:rgba(18,13,5,0.85);color:#e6a23c;font-family:\'Mantinia\',serif;font-size:1.15rem;letter-spacing:3px;box-shadow:0 0 24px rgba(230,162,60,0.4);">🚧 ' + shopL("BALD VERFÜGBAR","COMING SOON") + '</div></div>';
+      html += '</div>';
     }
     body.innerHTML = html;
   }
@@ -960,9 +962,17 @@
       <div class="stat-box"><div class="v">${s.bestScore || 0}</div><div class="l">${isDe ? 'Bester Score' : 'Best Score'}</div></div>`;
 
     var list = ER.getAchievements();
-    var done = list.filter(function (a) { return a.unlocked; }).length;
-    document.getElementById("ach-progress").textContent = (isDe ? "Freigeschaltet: " : "Unlocked: ") + done + " / " + list.length;
+    var isTowerAch = function (a) { return a.id && a.id.indexOf("tower") === 0; };   // Battle-Tower-Achievements vorerst "coming soon"
+    var activeList = list.filter(function (a) { return !isTowerAch(a); });
+    var done = activeList.filter(function (a) { return a.unlocked; }).length;
+    document.getElementById("ach-progress").textContent = (isDe ? "Freigeschaltet: " : "Unlocked: ") + done + " / " + activeList.length;
     document.getElementById("ach-grid").innerHTML = list.map(function (a) {
+      if (isTowerAch(a)) {
+        return '<div class="ach-card locked" style="opacity:0.7;">' +
+          '<div class="ic">🚧</div>' +
+          '<div><div class="nm">' + a.name + ' <span style="display:inline-block;margin-left:4px;padding:1px 7px;border:1px solid #e6a23c;border-radius:12px;background:rgba(230,162,60,0.14);color:#e6a23c;font-family:sans-serif;font-size:0.58rem;font-weight:bold;letter-spacing:1px;vertical-align:middle;">' + (isDe ? "BALD" : "SOON") + '</span></div>' +
+          '<div class="ds">' + a.desc + '</div></div></div>';
+      }
       return '<div class="ach-card ' + (a.unlocked ? "" : "locked") + '">' +
         '<div class="ic">' + (a.unlocked ? a.icon : "🔒") + '</div>' +
         '<div><div class="nm">' + a.name + '</div><div class="ds">' + a.desc + '</div></div></div>';
