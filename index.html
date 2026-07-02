@@ -174,17 +174,9 @@
     .stat-box .v { font-family: 'Mantinia', serif; color: var(--gold); font-size: 1.5rem; }
     .stat-box .l { font-size: 0.68rem; color: #888; font-family: sans-serif; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 3px; }
 
-    .btn-cam-spot { background: transparent; color: #666; border: 1px solid #333; padding: 8px 16px; font-family: sans-serif; font-size: 0.75rem; cursor: pointer; border-radius: 4px; transition: all 0.2s; }
-    .btn-cam-spot:hover { border-color: var(--gold); color: var(--gold); }
     .modal-center-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; margin: 0; background: rgba(5,5,5,0.92); z-index: 600; display: none; justify-content: center; align-items: center; padding: 16px; box-sizing: border-box; }
     .modal-center-overlay.open { display: flex; }
     .email-box { background: var(--panel); border: 1px solid var(--gold); border-radius: 8px; padding: 28px 32px; width: 340px; text-align: center; }
-    .cam-overlay { position: fixed; inset: 0; background: rgba(5,5,5,0.95); z-index: 600; display: none; justify-content: flex-end; align-items: flex-end; padding: 30px; }
-    .cam-overlay.open { display: flex; }
-    .cam-box { text-align: center; color: #888; font-family: sans-serif; font-size: 0.85rem; }
-    .cam-spot { width: 320px; height: 240px; border: 2px dashed var(--gold); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--gold); font-family: 'Mantinia', serif; font-size: 1.1rem; letter-spacing: 2px; position: relative; }
-    .cam-close { position: absolute; top: 20px; left: 20px; }
-    .cam-hint { font-size: 0.72rem; color: #888; font-family: sans-serif; margin-top: 8px; text-align: center; }
 
     @media (max-width: 540px) {
       h1 { font-size: 2.4rem; letter-spacing: 5px; margin-top: 32px; }
@@ -195,6 +187,7 @@
 </head>
 <body>
 
+<button id="btn-info" onclick="openModal('patchnotes')" title="Patch Notes" aria-label="Patch Notes" style="position:absolute;top:16px;left:16px;z-index:1000;padding:7px 13px;border-radius:20px;background:#0e0e0e;border:1px solid var(--gold-dark);color:var(--gold);font-family:sans-serif;font-size:0.68rem;font-weight:bold;letter-spacing:1.5px;cursor:pointer;transition:all 0.15s ease;" onmouseover="this.style.borderColor='var(--gold)';this.style.boxShadow='0 0 10px rgba(205,163,79,0.4)';this.style.transform='scale(1.05)';" onmouseout="this.style.borderColor='var(--gold-dark)';this.style.boxShadow='none';this.style.transform='scale(1)';">📜 PATCH NOTES</button>
 <div class="global-lang-switcher">
   <button class="btn-lang" id="btn-lang-de" onclick="window.i18n.setLang('de')">DE</button>
   <button class="btn-lang" id="btn-lang-en" onclick="window.i18n.setLang('en')">EN</button>
@@ -248,17 +241,7 @@
     <a href="https://discord.gg/mUSzTDw8Ns" target="_blank" class="btn-social btn-discord">💬 Discord</a>
   </div>
 
-  <div style="margin-top:16px; text-align:center;">
-    <button class="btn-cam-spot" id="btn-cam" onclick="document.getElementById('cam-overlay').classList.toggle('open')">🎥 Streamer Cam-Spot</button>
-  </div>
-
-<div class="cam-overlay" id="cam-overlay" onclick="this.classList.remove('open')">
-  <div class="cam-close"><button class="btn-mini" onclick="document.getElementById('cam-overlay').classList.remove('open')">✕ Schließen</button></div>
-  <div class="cam-box" onclick="event.stopPropagation()">
-    <div class="cam-spot">📷 CAM</div>
-    <div class="cam-hint">↑ Kamera hier platzieren (unten rechts)</div>
-  </div>
-</div>
+<div id="cam-hint-box" style="position:fixed;bottom:14px;right:14px;z-index:500;width:172px;height:130px;background:rgba(8,8,8,0.4);border:1px dashed rgba(205,163,79,0.5);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:rgba(232,222,192,0.82);font-family:sans-serif;font-size:0.82rem;line-height:1.4;padding:8px;pointer-events:none;user-select:none;box-shadow:0 2px 12px rgba(0,0,0,0.4);">🎥<br><b>Streamer?</b><br>Kamera hier hin!</div>
 
 <div class="modal-bg" id="modal-tower-guide">
   <div class="modal-box" style="max-width:520px;">
@@ -345,6 +328,14 @@
     <div class="stat-grid" id="stat-grid"></div>
     <div class="ach-progress" id="ach-progress"></div>
     <div class="ach-grid" id="ach-grid"></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-patchnotes">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModals()">&times;</button>
+    <div class="modal-title" id="patchnotes-title">📜 Patch Notes</div>
+    <div id="patchnotes-body"></div>
   </div>
 </div>
 
@@ -460,6 +451,7 @@
     if (document.getElementById("modal-bestenliste").classList.contains("open")) ladeBestenliste();
     if (document.getElementById("modal-achievements").classList.contains("open")) ladeAchievements();
     if (document.getElementById("modal-eldendex").classList.contains("open")) ladeEldendex();
+    if (document.getElementById("modal-patchnotes").classList.contains("open")) ladePatchNotes();
   });
 
   /* ===== Modal Handling ===== */
@@ -506,7 +498,42 @@
     if (name === "bestenliste") { fuelleLbKategorien(); ladeBestenliste(); }
     if (name === "achievements") ladeAchievements();
     if (name === "eldendex") ladeEldendex();
+    if (name === "patchnotes") ladePatchNotes();
     if (name === "seelenschmiede") renderShop();
+  }
+
+  function ladePatchNotes() {
+    var body = document.getElementById("patchnotes-body");
+    if (!body) return;
+    function sec(icon, title, items) {
+      return '<div style="margin-bottom:15px;">'
+        + '<div style="color:var(--gold);font-family:\'Mantinia\',serif;font-size:1.02rem;letter-spacing:1px;margin-bottom:5px;">' + icon + ' ' + title + '</div>'
+        + '<ul style="margin:0;padding-left:18px;color:#cabf9f;font-family:sans-serif;font-size:0.84rem;line-height:1.5;">'
+        + items.map(function (i) { return '<li style="margin-bottom:4px;">' + i + '</li>'; }).join('')
+        + '</ul></div>';
+    }
+    var html = '<div style="text-align:center;margin:2px 0 16px;">'
+      + '<div style="font-size:0.68rem;letter-spacing:3px;color:#8c6d2d;text-transform:uppercase;font-family:sans-serif;">' + shopL("Aktuelle Version", "Current Version") + '</div>'
+      + '<div style="color:var(--gold);font-family:\'Mantinia\',serif;font-size:1.5rem;letter-spacing:2px;">Patch 1.5</div></div>';
+    html += sec("🆕", shopL("Neu", "New"), [
+      shopL("<b>Roundtable-Truhen (Gacha):</b> Öffne Waffen- & Rüstungstruhen für Seelen und schalte neues Equipment frei. Duplikate erstatten die Hälfte zurück.", "<b>Roundtable chests (gacha):</b> Open weapon & armor chests for souls and unlock new gear. Duplicates refund half."),
+      shopL("<b>Pech-Schutz:</b> Nach mehreren Duplikaten in Folge ist die nächste Truhe garantiert ein neues Item – mit Fortschrittsleiste an jeder Truhe.", "<b>Pity system:</b> After several duplicates in a row, the next chest is a guaranteed new item — shown by a progress bar on each chest."),
+      shopL("<b>Eldendex:</b> Ein Kompendium für Waffen, Rüstungen, Gegner & Bosse.", "<b>Eldendex:</b> A compendium of weapons, armor, enemies & bosses."),
+      shopL("<b>26 neue Waffen</b> – von der Uchigatana bis zum Dunkelmondgroßschwert, nach Seltenheit einsortiert und im Schaden ausbalanciert.", "<b>26 new weapons</b> — from the Uchigatana to the Dark Moon Greatsword, sorted by rarity and balanced."),
+      shopL("<b>Der Haligtree ist zurück – jetzt im normalen Run:</b> Finde zwei Festungen, sammle beide Medaillon-Hälften und stelle dich nach Gideon optional <b>Malenia</b>. Überlebst du sie, geht es weiter zum Eldenthron.", "<b>The Haligtree returns — now in normal runs:</b> Find two forts, collect both medallion halves and optionally face <b>Malenia</b> after Gideon. Survive her and press on to the Elden Throne.")
+    ]);
+    html += sec("⚙️", shopL("Verbesserungen", "Improvements"), [
+      shopL("Zentrale Balance-Werte überarbeitet und aufeinander abgestimmt.", "Central balance values reworked and tuned to fit together.")
+    ]);
+    html += sec("🔧", shopL("Fixes", "Fixes"), [
+      shopL("Der Elden Beast greift nach Radagons Verwandlung nicht mehr sofort an (gilt auch für Malenias 2. Phase).", "The Elden Beast no longer attacks immediately after Radagon's transformation (also Malenia's 2nd phase)."),
+      shopL("Challenge-Runs landen jetzt zuverlässig in der richtigen Bestenlisten-Kategorie.", "Challenge runs now reliably land in the correct leaderboard category.")
+    ]);
+    html += sec("🔜", shopL("Bald", "Coming soon"), [
+      shopL("🏯 Battle Tower – ein endloser Aufstieg. Wie hoch schaffst du es?", "🏯 Battle Tower — an endless ascent. How high can you climb?"),
+      shopL("🎭 Skins & neue Starterklassen.", "🎭 Skins & new starter classes.")
+    ]);
+    body.innerHTML = html;
   }
 
   function openTowerGuide() {
@@ -582,7 +609,7 @@
   /* ===== ⚜️ ROUNDTABLE (Meta-Shop im Hauptmenü) ===== */
   var META_KEY = "eldenRogueMeta";
   var META_RESET_VERSION = 2;   // hochzählen = einmaliger Reset der Freischaltungen für alle Nutzer
-  var DEFAULT_WEAPONS = ["Dolch","Kurzschwert","Breitschwert","Rapier","Claymore","Bluthundreißzahn","Maltöter Großbeil","Großsterne","Rostiger Anker","Blasphemous Blade"];
+  var DEFAULT_WEAPONS = ["Keule","Großaxt","Uchigatana","Dolch","Kurzschwert","Breitschwert","Rapier","Claymore","Bluthundreißzahn","Maltöter Großbeil","Großsterne","Rostiger Anker","Blasphemous Blade"];
   var DEFAULT_ARMOR = ["Albinauric Set","Cleanrot Set","Briar Set","Haligtree Knight Set"];
   function metaDefault() { return { seelen:0, upgrades:{vitalitaet:0,schaerfe:0,wendigkeit:0,seelenfaenger:0,flakon:0}, unlockedWeapons: DEFAULT_WEAPONS.slice(), unlockedArmor: DEFAULT_ARMOR.slice(), unlockedSkins:[], activeSkinId:null, activeSkinFilter:"", chestPity:{waffe:0,ruestung:0}, resetVersion: META_RESET_VERSION }; }
   function ladeMeta() {
