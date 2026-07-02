@@ -251,7 +251,6 @@
     /* --- Hard Mode --- */
     { id: "hard_lord",     name: "Wahrer Elden Lord",   icon: "👑", desc: "Schließe einen Hard-Mode-Run ab.",       check: s => (s.hardModeCompletions || 0) >= 1 },
     { id: "hard_5",        name: "Masochist",           icon: "🩸", desc: "Schließe Hard-Mode 5x ab.",              check: s => (s.hardModeCompletions || 0) >= 5 },
-    { id: "hard_no_death", name: "Flawless",            icon: "✨", desc: "Schließe Hard-Mode ab, ohne zu sterben.", check: s => !!s.hardNoDeath },
     /* --- Challenges --- */
     { id: "challenge_auto",      name: "Zuschauer",        icon: "👁️", desc: "Schließe einen Auto-Battle-Run ab.", check: s => !!(s.challengesCompleted && s.challengesCompleted.autobattle) },
     { id: "challenge_noarmor",   name: "Nacktläufer",      icon: "🏃", desc: "Schließe einen No-Armor-Run ab.",     check: s => !!(s.challengesCompleted && s.challengesCompleted.noarmor) },
